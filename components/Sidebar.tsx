@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AppState } from '../types';
+import { AppState, BackgroundStyle } from '../types';
 import { MODEL_OPTIONS } from '../constants';
 
 interface SidebarProps {
@@ -16,6 +16,13 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, state, dispatch }) => {
   if (!isOpen) return null;
 
+  const bgOptions: { id: BackgroundStyle; label: string; color: string }[] = [
+    { id: 'magenta', label: 'CHROMA', color: '#FF00FF' },
+    { id: 'white', label: 'WHITE', color: '#FFFFFF' },
+    { id: 'gray', label: 'GRAY', color: '#808080' },
+    { id: 'gradient', label: 'STUDIO', color: 'linear-gradient(45deg, #ddd, #999)' }
+  ];
+
   return (
     <div className="fixed inset-0 z-[100] animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
@@ -23,17 +30,43 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, state, dispatch }) =
       <div className="absolute bottom-0 left-0 right-0 bg-[#0a0a0a] rounded-t-[3rem] p-8 pb-12 shadow-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-500">
         <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto mb-8" />
         
-        <div className="space-y-8">
+        <div className="space-y-8 max-h-[70vh] overflow-y-auto no-scrollbar">
           <div className="flex items-center justify-between">
             <h3 className="text-[12px] font-black uppercase tracking-widest text-white">Configuración del Motor</h3>
             <button onClick={onClose} className="p-2 text-slate-500">✕</button>
           </div>
 
+          {/* BACKGROUND SELECTOR */}
+          <section className="space-y-4">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Entorno de Síntesis (Background)</label>
+            <div className="grid grid-cols-4 gap-3">
+              {bgOptions.map(opt => (
+                <button 
+                  key={opt.id}
+                  onClick={() => dispatch({ 
+                    type: 'UPDATE_CONFIG', 
+                    payload: { 
+                      renderingProtocols: { ...state.renderingProtocols, backgroundStyle: opt.id } 
+                    } 
+                  })}
+                  className={`flex flex-col items-center gap-2 transition-all p-2 rounded-2xl border ${state.renderingProtocols.backgroundStyle === opt.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 bg-white/5'}`}
+                >
+                  <div 
+                    className="w-full aspect-square rounded-xl border border-white/10" 
+                    style={{ background: opt.color }}
+                  />
+                  <span className={`text-[7px] font-black tracking-tighter ${state.renderingProtocols.backgroundStyle === opt.id ? 'text-indigo-400' : 'text-slate-500'}`}>
+                    {opt.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="space-y-4">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Protocolos de Salida</label>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { id: 'magentaBackground', label: 'Chroma Magenta' },
                 { id: 'pixelPerfect', label: 'Pixel Perfect' },
                 { id: 'hd2dStyle', label: 'Estilo JRPG' },
                 { id: 'strongOutline', label: 'Contorno Pro' },

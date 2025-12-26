@@ -1,10 +1,11 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { ModelType, ImageSize, AspectRatio, OutlineConfig, RenderingProtocols } from "../types";
+import { ModelType, ImageSize, AspectRatio, OutlineConfig, RenderingProtocols, BackgroundStyle } from "../types";
 
 export class GeminiService {
-  private static async getAIInstance() {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Always instantiate right before calling to get the latest process.env.API_KEY
+  private static getAIInstance() {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
 
   private static async optimizeImage(base64: string, maxDim: number = 1024): Promise<string> {
@@ -33,6 +34,16 @@ export class GeminiService {
     });
   }
 
+  private static getBackgroundDescription(style: BackgroundStyle): string {
+    switch(style) {
+      case 'magenta': return 'Pure #FF00FF (Chroma Key Magenta). Absolute solid color, no variations.';
+      case 'white': return 'Pure solid white (#FFFFFF). No shadows or gradients.';
+      case 'gray': return 'Solid neutral gray (#808080). Flat professional look.';
+      case 'gradient': return 'Subtle studio gradient from light gray to medium gray. Minimal professional look.';
+      default: return 'Solid flat color.';
+    }
+  }
+
   static async generateEvolution(
     baseCharacter: string,
     parentSprite: string | null,
@@ -47,11 +58,10 @@ export class GeminiService {
       protocols: RenderingProtocols
     }
   ): Promise<string> {
-    const ai = await this.getAIInstance();
+    const ai = this.getAIInstance();
     const optBase = await this.optimizeImage(baseCharacter);
     const optParent = parentSprite ? await this.optimizeImage(parentSprite) : null;
 
-    // PROTOCOLO DE ANCLAJE ANATÓMICO 3.0 (ALGORITMO DE INSTRUCCIÓN)
     const anatomyLock = `
 CRITICAL ANATOMY LOCK v3.0:
 - Use the provided BASE IMAGE as a RIGID TEMPLATE. 
@@ -61,7 +71,7 @@ CRITICAL ANATOMY LOCK v3.0:
 
     const renderingLogic = `
 TECHNICAL RENDERING PIPELINE:
-- BACKGROUND: ${config.protocols.magentaBackground ? 'Pure #FF00FF (Chroma Key Magenta). Absolute solid color.' : 'Solid Flat Color.'}
+- BACKGROUND: ${this.getBackgroundDescription(config.protocols.backgroundStyle)}
 - STYLE: ${config.protocols.hd2dStyle ? 'Modern HD-2D Sprite (Death Metal/Queen\'s Blade aesthetic).' : 'Professional Concept Art.'}
 - LIGHTING: Consistent top-down studio lighting. No environmental shadows.
 - OUTLINE: ${config.protocols.strongOutline ? 'Sharp 2px black contour for game-engine compatibility.' : 'Soft artistic edges.'}`;
@@ -79,8 +89,8 @@ REQUIRED OUTPUT: A clean, isolated character asset ready for sprite-sheet extrac
 NO artistic backgrounds. NO floating particles. NO ground plane.`;
 
     const userPrompt = `[DESIGN DIRECTIVE]: ${prompt}
-[STYLE NOTES]: High-detail fantasy armor, tactical cutouts (underboob/sideboob), metallic reflections, JRPG Queen's Blade influence.
-[FORMAT]: Isolated sprite on ${config.protocols.magentaBackground ? 'magenta' : 'solid'} background.`;
+[STYLE NOTES]: High-detail fantasy armor, tactical cutouts, metallic reflections, JRPG influence.
+[FORMAT]: Isolated sprite on requested background.`;
 
     try {
       const parts: any[] = [
@@ -112,7 +122,7 @@ NO artistic backgrounds. NO floating particles. NO ground plane.`;
         return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
       }
       throw new Error("Neural synthesis failed to produce image data.");
-    } catch (e) {
+    } catch (e: any) {
       console.error("[Neural Engine Error]", e);
       throw e;
     }

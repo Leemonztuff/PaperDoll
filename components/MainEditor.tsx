@@ -1,6 +1,7 @@
 
 import React, { useRef, useState } from 'react';
 import { QUICK_TAGS } from '../constants';
+import { BackgroundStyle } from '../types';
 
 interface MainEditorProps {
   baseImage: string | null;
@@ -9,7 +10,7 @@ interface MainEditorProps {
   isGenerating: boolean;
   onResetParent: () => void;
   mutationStrength: number;
-  magentaActive: boolean;
+  backgroundStyle: BackgroundStyle;
   isSheetMode: boolean;
   prompt: string;
   setPrompt: (v: string) => void;
@@ -23,7 +24,7 @@ const MainEditor: React.FC<MainEditorProps> = ({
   isGenerating, 
   onResetParent, 
   mutationStrength, 
-  magentaActive,
+  backgroundStyle,
   prompt,
   setPrompt,
   onGenerate
@@ -41,11 +42,21 @@ const MainEditor: React.FC<MainEditorProps> = ({
     }
   };
 
+  const getBgClass = () => {
+    switch(backgroundStyle) {
+      case 'magenta': return 'bg-[#FF00FF]';
+      case 'white': return 'bg-white';
+      case 'gray': return 'bg-[#808080]';
+      case 'gradient': return 'bg-gradient-to-br from-gray-200 to-gray-500';
+      default: return 'bg-[#080808]';
+    }
+  };
+
   return (
     <div className="h-full flex flex-col relative">
       
       {/* 1. STAGE (TOP 65%) */}
-      <div className={`relative flex-1 flex items-center justify-center overflow-hidden transition-colors duration-700 ${magentaActive ? 'bg-[#FF00FF]' : 'bg-[#080808]'}`}>
+      <div className={`relative flex-1 flex items-center justify-center overflow-hidden transition-all duration-700 ${getBgClass()}`}>
         {!baseImage ? (
           <div 
             onClick={() => fileRef.current?.click()}
@@ -56,12 +67,14 @@ const MainEditor: React.FC<MainEditorProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em]">Cargar Maniquí</h3>
-            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-2 max-w-[180px]">Sube un personaje base para comenzar la forja.</p>
+            <h3 className={`text-[11px] font-black uppercase tracking-[0.3em] ${backgroundStyle === 'white' ? 'text-black' : 'text-white'}`}>Cargar Maniquí</h3>
+            <p className={`text-[8px] font-bold uppercase tracking-widest mt-2 max-w-[180px] ${backgroundStyle === 'white' ? 'text-slate-600' : 'text-slate-500'}`}>Sube un personaje base para comenzar la forja.</p>
           </div>
         ) : (
           <div className="relative w-full h-full p-4 flex items-center justify-center">
-            {!magentaActive && <div className="absolute inset-0 opacity-[0.05] pointer-events-none checker-bg" />}
+            {backgroundStyle !== 'magenta' && backgroundStyle !== 'white' && backgroundStyle !== 'gray' && (
+              <div className="absolute inset-0 opacity-[0.05] pointer-events-none checker-bg" />
+            )}
             
             <img 
               src={baseImage} 
@@ -71,7 +84,7 @@ const MainEditor: React.FC<MainEditorProps> = ({
             {parentImage && !showBase && (
               <img 
                 src={parentImage} 
-                className="absolute max-h-[85%] max-w-[85%] object-contain drop-shadow-[0_0_50px_rgba(79,70,229,0.3)] animate-in zoom-in-95" 
+                className="absolute max-h-[85%] max-w-[85%] object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.3)] animate-in zoom-in-95" 
               />
             )}
 
