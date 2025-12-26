@@ -1,0 +1,7 @@
+{
+  "name": "Atelier Alpha 3.0 - Mobile Edition",
+  "description": "AI-Powered Paperdoll System with Advanced Alpha Extraction and Anatomy Lock Algorithms.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
