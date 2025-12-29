@@ -81,7 +81,7 @@ const App: React.FC = () => {
       
       {/* DESKTOP SIDEBAR */}
       {isDesktop && (
-        <aside className="w-72 bg-[#050505] border-r border-white/5 flex flex-col shrink-0 z-50">
+        <aside className="w-72 bg-[#050505] border-r border-white/5 flex flex-col shrink-0 z-50 shadow-2xl shadow-black">
           <div className="h-20 px-8 flex items-center border-b border-white/5">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-600/30 mr-3">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,7 +97,7 @@ const App: React.FC = () => {
             <SidebarItem tab="forge" label="Atelier Neural" hint="Diseño y Creación" icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             } />
-            <SidebarItem tab="vault" label="Bóveda Genética" hint="Mis Creaciones Guardadas" icon={
+            <SidebarItem tab="vault" label="Archivo Genético" hint="Bóveda de Especímenes" icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
             } />
             <SidebarItem tab="tree" label="Árbol de Evolución" hint="Ramas de Diseño" icon={
@@ -107,17 +107,18 @@ const App: React.FC = () => {
 
           <div className="p-8 border-t border-white/5 space-y-4">
              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[7px] font-black uppercase text-indigo-400 mb-2">Ayuda rápida</p>
-                <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-                  Carga un sprite, escribe un atuendo y presiona "Forjar" para ver la magia.
-                </p>
+                <p className="text-[7px] font-black uppercase text-indigo-400 mb-2">Estado del Sistema</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">Neural Link v2.5 Stable</p>
+                </div>
              </div>
             <button 
               onClick={() => setIsConfigOpen(true)}
               className="w-full flex items-center justify-between px-6 py-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-white hover:border-indigo-500/50 transition-all"
             >
-              <span>Estado del Pipeline</span>
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span>Pipeline IA</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
             </button>
           </div>
         </aside>
@@ -142,10 +143,23 @@ const App: React.FC = () => {
           
           {activeTab === 'vault' && (
             <div className="h-full bg-[#050505] animate-in fade-in duration-300 flex flex-col">
-              <header className="h-16 md:h-20 px-6 md:px-12 flex items-center justify-between border-b border-white/5 safe-top shrink-0">
+              <header className="h-16 md:h-24 px-8 md:px-12 flex items-center justify-between border-b border-white/5 safe-top shrink-0 bg-black/40 backdrop-blur-3xl z-40">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Archivo Genético</span>
-                  <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest hidden md:block">Todos tus diseños guardados en la nube local</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                    <span className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.4em] text-white">Archivo Genético</span>
+                  </div>
+                  <p className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-2 hidden md:block">Registro centralizado de especímenes y evoluciones neurales</p>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-end mr-4 hidden sm:flex">
+                    <span className="text-[10px] font-black text-white">{state.outfits.length}</span>
+                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">Entradas</span>
+                  </div>
+                  <IconButton onClick={() => window.print()} className="bg-white/5" title="Exportar Log">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </IconButton>
                 </div>
               </header>
               <div className="flex-1 overflow-hidden">
@@ -170,7 +184,7 @@ const App: React.FC = () => {
             </button>
             <button onClick={() => setActiveTab('vault')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'vault' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-              <span className="text-[7px] font-black uppercase tracking-widest">Bóveda</span>
+              <span className="text-[7px] font-black uppercase tracking-widest">Archivo</span>
             </button>
             <button onClick={() => setActiveTab('tree')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tree' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>

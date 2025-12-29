@@ -50,7 +50,7 @@ export const Atelier: React.FC<AtelierProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState(QUICK_TAGS[0].category);
   const [isControlsExpanded, setIsControlsExpanded] = useState(false);
-  const [mobilePhase, setMobilePhase] = useState<'config' | 'directive'>('directive');
+  const [mobilePhase, setMobilePhase] = useState<'directive' | 'config'>('directive');
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,15 +66,6 @@ export const Atelier: React.FC<AtelierProps> = ({
     if (bg === 'white') return 'bg-white';
     return 'bg-[#0a0a0a]';
   }, [state.config.protocols.backgroundStyle]);
-
-  const handleDownload = () => {
-    const url = state.activeParent?.url || state.baseImage;
-    if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `spriteforge-${Date.now()}.png`;
-    link.click();
-  };
 
   const currentStatusText = useMemo(() => {
     if (!state.baseImage) return "Esperando carga de personaje";
