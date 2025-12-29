@@ -1,267 +1,221 @@
 
-import React, { useState, useEffect, useReducer } from 'react';
-import { GeneratedOutfit, AppState } from './types';
-import { GeminiService } from './services/geminiService';
-import { StorageService } from './services/storageService';
-import { ImageProcessor } from './services/imageProcessor';
-import MainEditor from './components/MainEditor';
-import ResultGallery from './components/ResultGallery';
-import Sidebar from './components/Sidebar';
-
-// Define the AIStudio interface to match environmental definitions and satisfy TypeScript property type requirements.
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-declare global {
-  interface Window {
-    // Use the named interface and identical modifiers (readonly) to align with existing global declarations in the environment.
-    readonly aistudio: AIStudio;
-  }
-}
-
-type Action = 
-  | { type: 'ADD_OUTFIT'; payload: GeneratedOutfit }
-  | { type: 'REMOVE_OUTFIT'; payload: string }
-  | { type: 'SET_PARENT'; payload: GeneratedOutfit | null }
-  | { type: 'SET_BASE'; payload: string | null }
-  | { type: 'SET_GENERATING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'UPDATE_CONFIG'; payload: Partial<AppState> }
-  | { type: 'SET_OUTFITS'; payload: GeneratedOutfit[] };
-
-function appReducer(state: AppState, action: Action): AppState {
-  switch (action.type) {
-    case 'ADD_OUTFIT': return { ...state, outfits: [action.payload, ...state.outfits] };
-    case 'REMOVE_OUTFIT': return { ...state, outfits: state.outfits.filter(o => o.id !== action.payload) };
-    case 'SET_PARENT': return { ...state, activeEvolutionParent: action.payload };
-    case 'SET_BASE': return { ...state, baseImage: action.payload };
-    case 'SET_GENERATING': return { ...state, isGenerating: action.payload };
-    case 'SET_ERROR': return { ...state, error: action.payload };
-    case 'UPDATE_CONFIG': return { ...state, ...action.payload };
-    case 'SET_OUTFITS': return { ...state, outfits: action.payload };
-    default: return state;
-  }
-}
+import React, { useState, useEffect } from 'react';
+import { useSpriteForge } from './hooks/useSpriteForge';
+import { Atelier } from './components/Atelier';
+import { Vault } from './components/Vault';
+import { EvolutionTree } from './components/EvolutionTree';
+import { IconButton } from './components/UI';
+import { ImageModal } from './components/ImageModal';
+import { GeneratedOutfit, ForgeMode, NeuralMacro } from './types';
+import { ANATOMICAL_MACROS } from './constants';
 
 const App: React.FC = () => {
-  const [state, dispatch] = useReducer(appReducer, {
-    baseImage: null,
-    activeEvolutionParent: null,
-    outfits: [],
-    isGenerating: false,
-    selectedModel: 'gemini-2.5-flash-image',
-    selectedSize: '1K',
-    selectedAspectRatio: '9:16',
-    outline: { enabled: false, color: '#4f46e5', thickness: 'medium', glow: false },
-    error: null,
-    isCharacterSheetMode: false,
-    mutationStrength: 50,
-    renderingProtocols: {
-      backgroundStyle: 'magenta',
-      pixelPerfect: true,
-      strongOutline: true,
-      hd2dStyle: true
-    }
-  });
-
-  const [activeTab, setActiveTab] = useState<'editor' | 'vault'>('editor');
+  const { state, dispatch, uploadBaseDNA, executeBaseExtraction, executeSynthesis, deleteAsset } = useSpriteForge();
+  
   const [prompt, setPrompt] = useState('');
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [needsApiKey, setNeedsApiKey] = useState(false);
+  const [activeTab, setActiveTab] = useState<'forge' | 'vault' | 'tree'>('forge');
+  const [selectedOutfit, setSelectedOutfit] = useState<GeneratedOutfit | null>(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
   useEffect(() => {
-    StorageService.getAllOutfits().then(data => dispatch({ type: 'SET_OUTFITS', payload: data }));
-    
-    // Check if API key is needed for Pro models
-    const checkKey = async () => {
-      if (state.selectedModel.includes('pro')) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setNeedsApiKey(!hasKey);
-      } else {
-        setNeedsApiKey(false);
-      }
-    };
-    checkKey();
-  }, [state.selectedModel]);
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  const handleOpenKeySelector = async () => {
-    await window.aistudio.openSelectKey();
-    setNeedsApiKey(false);
+  const handleSelectAsset = (outfit: GeneratedOutfit) => setSelectedOutfit(outfit);
+
+  const handleApplyAsParent = (outfit: GeneratedOutfit) => {
+    dispatch({ type: 'SET_ACTIVE_PARENT', payload: outfit });
+    setPrompt(outfit.prompt || '');
+    setActiveTab('forge');
   };
 
-  const handleSelectParent = (outfit: GeneratedOutfit) => {
-    dispatch({ type: 'SET_PARENT', payload: outfit });
-    setPrompt(outfit.prompt);
-    setActiveTab('editor');
-  };
-
-  const handleForge = async () => {
-    if (!state.baseImage) {
-      dispatch({ type: 'SET_ERROR', payload: "BLOQUEO: Carga un maniquí base primero." });
-      return;
-    }
-
-    if (needsApiKey) {
-      await handleOpenKeySelector();
-      // Proceed assuming success as per instructions
-    }
-    
-    dispatch({ type: 'SET_GENERATING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
-    try {
-      const url = await GeminiService.generateEvolution(
-        state.baseImage,
-        state.activeEvolutionParent?.url || null,
-        prompt || "Detailed fantasy character outfit",
-        state.mutationStrength,
-        {
-          model: state.selectedModel,
-          aspectRatio: state.selectedAspectRatio,
-          outline: state.outline,
-          isCharacterSheet: state.isCharacterSheetMode,
-          size: state.selectedSize,
-          protocols: state.renderingProtocols
-        }
-      );
-
-      const newAsset: GeneratedOutfit = {
-        id: crypto.randomUUID(),
-        url: url,
-        originalUrl: url,
-        parentId: state.activeEvolutionParent?.id,
-        prompt: prompt,
-        timestamp: Date.now(),
-        model: state.selectedModel,
-        aspectRatio: state.selectedAspectRatio,
-        evolutionStep: (state.activeEvolutionParent?.evolutionStep || 0) + 1
-      };
-
-      await StorageService.saveOutfit(newAsset);
-      dispatch({ type: 'ADD_OUTFIT', payload: newAsset });
-      dispatch({ type: 'SET_PARENT', payload: newAsset });
-    } catch (e: any) {
-      const errorMsg = e.message || "Error desconocido";
-      if (errorMsg.includes("Requested entity was not found")) {
-        setNeedsApiKey(true);
-        dispatch({ type: 'SET_ERROR', payload: "SESIÓN EXPIRADA: Selecciona tu API Key de nuevo." });
-      } else {
-        dispatch({ type: 'SET_ERROR', payload: "Error Neural: " + errorMsg });
-      }
-    } finally {
-      dispatch({ type: 'SET_GENERATING', payload: false });
+  const handlePromoteToBase = (url: string) => {
+    if (confirm("¿Establecer este diseño como la nueva base? Esto reiniciará la cadena evolutiva desde este punto.")) {
+      dispatch({ type: 'SET_BASE_IMAGE', payload: url });
     }
   };
+
+  const handleApplyMacro = (macro: NeuralMacro) => {
+    const resetChain = state.config.neuralChain.map(node => ({ ...node, isActive: true }));
+    const newChain = resetChain.map(node => ({
+      ...node,
+      isActive: !macro.nodesToDisable.includes(node.id)
+    }));
+
+    dispatch({ 
+      type: 'UPDATE_CONFIG', 
+      payload: { 
+        neuralChain: newChain,
+        mutationStrength: macro.mutationStrength,
+        activeMacroId: macro.id
+      } 
+    });
+
+    if (macro.promptSuffix && !prompt.includes(macro.promptSuffix)) {
+       setPrompt(prev => prev ? `${prev}, ${macro.promptSuffix}` : macro.promptSuffix);
+    }
+  };
+
+  const SidebarItem = ({ tab, icon, label, hint }: { tab: typeof activeTab; icon: React.ReactNode; label: string; hint: string }) => (
+    <button 
+      onClick={() => setActiveTab(tab)} 
+      className={`w-full flex items-center gap-4 px-6 py-4 transition-all border-r-2 ${
+        activeTab === tab 
+        ? 'bg-indigo-600/10 border-indigo-500 text-indigo-400' 
+        : 'border-transparent text-slate-500 hover:text-white hover:bg-white/5'
+      }`}
+    >
+      <div className={`${activeTab === tab ? 'scale-110' : ''} transition-transform`}>{icon}</div>
+      <div className="flex flex-col items-start">
+        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</span>
+        <span className="text-[6px] font-bold uppercase opacity-40 tracking-widest">{hint}</span>
+      </div>
+    </button>
+  );
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#050505] text-[#e2e8f0] font-sans overflow-hidden">
+    <div className="fixed inset-0 flex bg-[#020202] text-[#f8fafc] font-sans overflow-hidden">
       
-      {/* NAVEGACIÓN SUPERIOR */}
-      <header className="h-16 px-6 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 backdrop-blur-xl z-50">
-        <h1 className="text-[12px] font-black uppercase tracking-[0.3em]">
-          Atelier <span className="text-indigo-500">Mobile</span>
-        </h1>
-        <div className="flex items-center gap-3">
-          {needsApiKey && (
+      {/* DESKTOP SIDEBAR */}
+      {isDesktop && (
+        <aside className="w-72 bg-[#050505] border-r border-white/5 flex flex-col shrink-0 z-50">
+          <div className="h-20 px-8 flex items-center border-b border-white/5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-600/30 mr-3">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h1 className="text-[10px] font-black uppercase tracking-[0.3em]">
+              SpriteForge <span className="text-indigo-500">RPG</span>
+            </h1>
+          </div>
+
+          <nav className="flex-1 py-10 flex flex-col gap-2">
+            <SidebarItem tab="forge" label="Atelier Neural" hint="Diseño y Creación" icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            } />
+            <SidebarItem tab="vault" label="Bóveda Genética" hint="Mis Creaciones Guardadas" icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+            } />
+            <SidebarItem tab="tree" label="Árbol de Evolución" hint="Ramas de Diseño" icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            } />
+          </nav>
+
+          <div className="p-8 border-t border-white/5 space-y-4">
+             <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                <p className="text-[7px] font-black uppercase text-indigo-400 mb-2">Ayuda rápida</p>
+                <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+                  Carga un sprite, escribe un atuendo y presiona "Forjar" para ver la magia.
+                </p>
+             </div>
             <button 
-              onClick={handleOpenKeySelector}
-              className="px-3 py-1 bg-amber-500/10 border border-amber-500/50 rounded-full text-[8px] font-black text-amber-500 uppercase tracking-widest animate-pulse"
+              onClick={() => setIsConfigOpen(true)}
+              className="w-full flex items-center justify-between px-6 py-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-white hover:border-indigo-500/50 transition-all"
             >
-              Key Required
+              <span>Estado del Pipeline</span>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             </button>
-          )}
-          <button 
-            onClick={() => setIsConfigOpen(true)}
-            className="p-2 bg-white/5 rounded-full"
-          >
-            <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-      </header>
+          </div>
+        </aside>
+      )}
 
-      {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 overflow-hidden relative">
-        {activeTab === 'editor' ? (
-          <MainEditor 
-            baseImage={state.baseImage}
-            parentImage={state.activeEvolutionParent?.url || null}
-            onUploadBase={(url) => dispatch({ type: 'SET_BASE', payload: url })}
-            isGenerating={state.isGenerating}
-            onResetParent={() => dispatch({ type: 'SET_PARENT', payload: null })}
-            mutationStrength={state.mutationStrength}
-            backgroundStyle={state.renderingProtocols.backgroundStyle}
-            isSheetMode={state.isCharacterSheetMode}
-            prompt={prompt}
-            setPrompt={setPrompt}
-            onGenerate={handleForge}
-          />
-        ) : (
-          <div className="h-full overflow-y-auto p-6 pb-24 no-scrollbar">
-            <ResultGallery 
-              outfits={state.outfits}
-              activeParentId={state.activeEvolutionParent?.id || null}
-              onSelectParent={handleSelectParent}
-              onRemoveOutfit={(id) => {
-                StorageService.deleteOutfit(id);
-                dispatch({ type: 'REMOVE_OUTFIT', payload: id });
-              }}
-              onProcessPNG={async (o) => {
-                const url = await ImageProcessor.processAlpha(o.url, 45, 4);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `outfit-${o.id}.png`;
-                link.click();
-              }}
-              isGenerating={state.isGenerating}
+      {/* Area de Contenido */}
+      <div className="flex-1 relative flex flex-col min-w-0">
+        <main className="flex-1 relative overflow-hidden">
+          {activeTab === 'forge' && (
+            <Atelier 
+              state={state} prompt={prompt} setPrompt={setPrompt}
+              onUpload={uploadBaseDNA}
+              onForge={() => executeSynthesis(prompt)}
+              onExtractBase={executeBaseExtraction}
+              onResetParent={() => dispatch({ type: 'SET_ACTIVE_PARENT', payload: null })}
+              onUpdateMutation={(v) => dispatch({ type: 'UPDATE_CONFIG', payload: { mutationStrength: v, activeMacroId: undefined } })}
+              onSetMode={(m) => dispatch({ type: 'SET_FORGE_MODE', payload: m })}
+              onApplyMacro={handleApplyMacro}
+              onPromoteToBase={handlePromoteToBase}
             />
-          </div>
+          )}
+          
+          {activeTab === 'vault' && (
+            <div className="h-full bg-[#050505] animate-in fade-in duration-300 flex flex-col">
+              <header className="h-16 md:h-20 px-6 md:px-12 flex items-center justify-between border-b border-white/5 safe-top shrink-0">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Archivo Genético</span>
+                  <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest hidden md:block">Todos tus diseños guardados en la nube local</p>
+                </div>
+              </header>
+              <div className="flex-1 overflow-hidden">
+                <Vault outfits={state.outfits} activeId={state.activeParent?.id} onSelect={handleSelectAsset} onDelete={deleteAsset} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'tree' && (
+            <div className="h-full bg-[#030303] animate-in fade-in zoom-in-95 duration-500">
+              <EvolutionTree outfits={state.outfits} baseImage={state.baseImage} activeId={state.activeParent?.id} onSelect={handleSelectAsset} />
+            </div>
+          )}
+        </main>
+
+        {/* MOBILE TAB BAR */}
+        {!isDesktop && (
+          <nav className="h-20 bg-black/80 backdrop-blur-3xl border-t border-white/10 flex items-center justify-around px-6 safe-bottom shrink-0 z-[1000]">
+            <button onClick={() => setActiveTab('forge')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'forge' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <span className="text-[7px] font-black uppercase tracking-widest">Crear</span>
+            </button>
+            <button onClick={() => setActiveTab('vault')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'vault' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+              <span className="text-[7px] font-black uppercase tracking-widest">Bóveda</span>
+            </button>
+            <button onClick={() => setActiveTab('tree')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tree' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              <span className="text-[7px] font-black uppercase tracking-widest">Árbol</span>
+            </button>
+            <button onClick={() => setIsConfigOpen(true)} className="flex flex-col items-center gap-1 text-slate-600 active:text-white transition-all">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+              <span className="text-[7px] font-black uppercase tracking-widest">IA</span>
+            </button>
+          </nav>
         )}
+      </div>
 
-        {state.error && (
-          <div className="absolute top-4 left-6 right-6 bg-red-500/90 backdrop-blur-md p-3 rounded-xl flex items-center justify-between z-50">
-            <span className="text-[9px] font-black uppercase tracking-widest">{state.error}</span>
-            <button onClick={() => dispatch({ type: 'SET_ERROR', payload: null })}>✕</button>
+      {/* Modales */}
+      {selectedOutfit && (
+        <ImageModal outfit={selectedOutfit} onClose={() => setSelectedOutfit(null)} onDelete={deleteAsset} onSelectAsParent={handleApplyAsParent} />
+      )}
+
+      {isConfigOpen && (
+        <div className="fixed inset-0 z-[2100] animate-in fade-in duration-300 flex items-end md:items-center justify-center">
+          <div className="absolute inset-0 bg-black/98 backdrop-blur-xl" onClick={() => setIsConfigOpen(false)} />
+          <div className="relative w-full md:max-w-2xl bg-[#0a0a0a] rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-12 border-t md:border border-white/10 animate-in slide-in-from-bottom duration-500 max-h-[85vh] overflow-y-auto no-scrollbar safe-bottom">
+            <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-8 md:hidden" />
+            <div className="flex flex-col mb-10">
+              <h3 className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.4em] text-indigo-400 border-l-4 border-indigo-600 px-4">Configuración del Cerebro IA</h3>
+              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-5 mt-2">Módulos activos en el pipeline de síntesis</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {state.config.neuralChain.map(node => (
+                <button 
+                  key={node.id} disabled={node.isLocked} onClick={() => dispatch({ type: 'TOGGLE_NODE', payload: node.id })}
+                  className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-[0.98] ${node.isActive ? 'bg-indigo-600/10 border-indigo-500/40 text-white' : 'bg-white/5 border-transparent text-slate-600 opacity-40'}`}
+                >
+                  <div className="text-left">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">{node.label}</p>
+                    <p className="text-[7px] md:text-[8px] font-bold opacity-40 uppercase mt-0.5">{node.description}</p>
+                  </div>
+                  {node.isActive && <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1]" />}
+                </button>
+              ))}
+            </div>
+            <div className="h-10 md:hidden" />
           </div>
-        )}
-      </main>
-
-      {/* BARRA DE NAVEGACIÓN INFERIOR */}
-      <nav className="h-20 bg-[#0a0a0a]/95 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around safe-bottom z-50">
-        <button 
-          onClick={() => setActiveTab('editor')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'editor' ? 'text-indigo-400 scale-110' : 'text-slate-600'}`}
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-          </svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">Atelier</span>
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('vault')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'vault' ? 'text-indigo-400 scale-110' : 'text-slate-600'}`}
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">Vault</span>
-        </button>
-      </nav>
-
-      <Sidebar 
-        isOpen={isConfigOpen} 
-        onClose={() => setIsConfigOpen(false)} 
-        state={state} 
-        dispatch={dispatch} 
-        prompt={prompt} 
-        setPrompt={setPrompt} 
-        onGenerate={handleForge} 
-      />
+        </div>
+      )}
     </div>
   );
 };

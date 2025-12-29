@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#050505">
     <link rel="manifest" href="/manifest.json">
-    <title>Atelier Alpha 3.0 Mobile</title>
+    <title>SpriteForge RPG | Neural Asset Factory</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;900&display=swap" rel="stylesheet">
     <style>
@@ -31,6 +31,28 @@
         .safe-bottom {
             padding-bottom: env(safe-area-inset-bottom);
         }
+        .safe-top {
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        /* Custom Scrollbar for Desktop */
+        @media (min-width: 768px) {
+          ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+          }
+          ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+          }
+          ::-webkit-scrollbar-thumb {
+            background: rgba(79, 70, 229, 0.3);
+            border-radius: 10px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: rgba(79, 70, 229, 0.5);
+          }
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -46,6 +68,11 @@
         }
         .animate-pulse-slow {
             animation: pulse-ring 3s ease-in-out infinite;
+        }
+
+        input[type="range"] {
+          height: 32px;
+          background: transparent;
         }
     </style>
 <script type="importmap">

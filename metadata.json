@@ -1,6 +1,6 @@
 {
-  "name": "Atelier Alpha 3.0 - Mobile Edition",
-  "description": "AI-Powered Paperdoll System with Advanced Alpha Extraction and Anatomy Lock Algorithms.",
+  "name": "SpriteForge RPG v1.5",
+  "description": "Clean-Architecture AI-Powered Sprite Evolution System.",
   "requestFramePermissions": [
     "camera"
   ]
