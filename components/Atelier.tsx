@@ -85,8 +85,8 @@ export const Atelier: React.FC<AtelierProps> = ({
 
   if (!state.baseImage) {
     return (
-      <div className="h-full w-full bg-[#050505] overflow-y-auto no-scrollbar safe-top safe-bottom">
-        <div className="min-h-full flex flex-col items-center p-8 pb-24 md:justify-center">
+      <div className="absolute inset-0 bg-[#050505] overflow-y-auto overflow-x-hidden safe-top safe-bottom">
+        <div className="min-h-full flex flex-col items-center p-8 pb-32 md:justify-center">
           <div className="mb-12 text-center max-w-xs shrink-0">
             <h2 className="text-[14px] font-black uppercase tracking-[0.5em] text-white mb-3">Protocolo de Inicio</h2>
             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
@@ -100,12 +100,12 @@ export const Atelier: React.FC<AtelierProps> = ({
               { step: 2, title: "Define Estilo", desc: "Elige una clase o describe un equipo" },
               { step: 3, title: "Forja ADN", desc: "La IA generará el sprite pixel-perfect" }
             ].map(s => (
-              <div key={s.step} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-black text-white mb-4 shadow-lg shadow-indigo-600/30">
+              <div key={s.step} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center text-center shadow-lg shadow-black/50">
+                <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-[12px] font-black text-white mb-4 shadow-lg shadow-indigo-600/30">
                   {s.step}
                 </div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white mb-2">{s.title}</h3>
-                <p className="text-[8px] font-bold text-slate-500 uppercase leading-relaxed">{s.desc}</p>
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-white mb-2">{s.title}</h3>
+                <p className="text-[9px] font-bold text-slate-500 uppercase leading-relaxed">{s.desc}</p>
               </div>
             ))}
           </div>
