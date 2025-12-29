@@ -4,13 +4,11 @@ import { ForgeConfig } from "../types";
 
 export class GeminiService {
   private static getClient(): GoogleGenAI {
-    // Prioridad 1: Llave manual pegada por el usuario en el navegador
-    // Prioridad 2: Llave inyectada por el entorno (process.env)
     const manualKey = localStorage.getItem('SF_API_KEY');
     const apiKey = manualKey || process.env.API_KEY;
 
-    if (!apiKey) {
-      throw new Error("No hay llave API activa. Por favor, pega tu llave en Configuración.");
+    if (!apiKey || apiKey.length < 10) {
+      throw new Error("API Key inválida o no configurada.");
     }
     
     return new GoogleGenAI({ apiKey });
@@ -24,8 +22,8 @@ export class GeminiService {
         contents: `Act as a RPG Lead Artist. Convert this description into a professional game asset prompt for pixel art. Focus on outfits, materials and gear. Output ONLY the refined prompt. Input: "${userPrompt}"`,
       });
       return response.text?.trim() || userPrompt;
-    } catch (error) {
-      console.error("Prompt enhancement error:", error);
+    } catch (error: any) {
+      this.handleApiError(error);
       return userPrompt;
     }
   }
@@ -56,8 +54,9 @@ export class GeminiService {
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-      throw new Error("Error extrayendo base.");
+      throw new Error("No se pudo extraer la base.");
     } catch (error: any) {
+      this.handleApiError(error);
       throw error;
     }
   }
@@ -108,7 +107,18 @@ export class GeminiService {
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
       throw new Error("La síntesis falló.");
     } catch (error: any) {
+      this.handleApiError(error);
       throw error;
+    }
+  }
+
+  private static handleApiError(error: any) {
+    console.error("Gemini API Error:", error);
+    if (error.message?.includes("429") || error.message?.includes("Quota")) {
+      throw new Error("Cuota agotada. Por favor, cambia tu API Key en Configuración.");
+    }
+    if (error.message?.includes("API key not found") || error.message?.includes("403")) {
+      throw new Error("API Key inválida. Revisa tu configuración.");
     }
   }
 
