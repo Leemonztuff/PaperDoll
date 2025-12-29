@@ -10,6 +10,7 @@ export class GeminiService {
    * Extracción de Maniquí Base (ADN Puro).
    */
   static async extractBaseDNA(sourceImage: string, config: ForgeConfig): Promise<string> {
+    // IMPORTANTE: Crear instancia nueva para capturar la API Key actualizada si el usuario la cambió
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
     const systemInstruction = `
@@ -43,6 +44,10 @@ export class GeminiService {
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
       throw new Error("Base extraction failed.");
     } catch (error: any) {
+      if (error.message && error.message.includes("Requested entity was not found")) {
+        // Error de API Key
+        if (window.aistudio) await window.aistudio.openSelectKey();
+      }
       throw new Error(`Neural Link Error: ${error.message}`);
     }
   }
@@ -114,6 +119,9 @@ export class GeminiService {
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
       throw new Error("Synthesis failed to return pixel data.");
     } catch (error: any) {
+      if (error.message && error.message.includes("Requested entity was not found")) {
+        if (window.aistudio) await window.aistudio.openSelectKey();
+      }
       throw new Error(`Synthesis failure: ${error.message}`);
     }
   }

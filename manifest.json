@@ -1,9 +1,9 @@
 
 {
-  "name": "SpriteForge RPG v1.0",
+  "name": "SpriteForge RPG v1.5",
   "short_name": "SpriteForge",
-  "description": "Professional AI-Powered Sprite Evolution & Outfit Synthesis System",
-  "start_url": "/",
+  "description": "Neural Sprite Evolution Engine for RPG Assets",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#4f46e5",

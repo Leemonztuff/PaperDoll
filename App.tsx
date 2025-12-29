@@ -6,7 +6,7 @@ import { Vault } from './components/Vault';
 import { EvolutionTree } from './components/EvolutionTree';
 import { IconButton } from './components/UI';
 import { ImageModal } from './components/ImageModal';
-import { GeneratedOutfit, ForgeMode, NeuralMacro } from './types';
+import { GeneratedOutfit, ForgeMode, NeuralMacro, ModelType } from './types';
 import { ANATOMICAL_MACROS } from './constants';
 
 const App: React.FC = () => {
@@ -17,10 +17,17 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'forge' | 'vault' | 'tree'>('forge');
   const [selectedOutfit, setSelectedOutfit] = useState<GeneratedOutfit | null>(null);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
+    
+    // Verificar si el usuario ya seleccionó una llave
+    if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+      window.aistudio.hasSelectedApiKey().then(setHasApiKey);
+    }
+
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -36,6 +43,22 @@ const App: React.FC = () => {
     if (confirm("¿Establecer este diseño como la nueva base? Esto reiniciará la cadena evolutiva desde este punto.")) {
       dispatch({ type: 'SET_BASE_IMAGE', payload: url });
     }
+  };
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+    }
+  };
+
+  const handleModelChange = (model: ModelType) => {
+    if (model === 'gemini-3-pro-image-preview' && !hasApiKey) {
+      if (confirm("El modelo Pro requiere que selecciones tu propia API Key pagada. ¿Deseas conectarla ahora?")) {
+        handleConnectKey();
+      }
+    }
+    dispatch({ type: 'UPDATE_CONFIG', payload: { model } });
   };
 
   const handleApplyMacro = (macro: NeuralMacro) => {
@@ -109,9 +132,14 @@ const App: React.FC = () => {
              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                 <p className="text-[7px] font-black uppercase text-indigo-400 mb-2">Estado del Sistema</p>
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">Neural Link v2.5 Stable</p>
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasApiKey ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+                  <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">
+                    {hasApiKey ? 'Neural Link Active' : 'Basic Mode - No Key'}
+                  </p>
                 </div>
+                {!hasApiKey && (
+                  <button onClick={handleConnectKey} className="mt-3 text-[6px] text-indigo-400 font-black uppercase hover:underline">Conectar API Key Pro</button>
+                )}
              </div>
             <button 
               onClick={() => setIsConfigOpen(true)}
@@ -183,7 +211,7 @@ const App: React.FC = () => {
               <span className="text-[7px] font-black uppercase tracking-widest">Crear</span>
             </button>
             <button onClick={() => setActiveTab('vault')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'vault' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002-2h10a2 2 0 002-2V8m-9 4h4" /></svg>
               <span className="text-[7px] font-black uppercase tracking-widest">Archivo</span>
             </button>
             <button onClick={() => setActiveTab('tree')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tree' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
@@ -208,10 +236,34 @@ const App: React.FC = () => {
           <div className="absolute inset-0 bg-black/98 backdrop-blur-xl" onClick={() => setIsConfigOpen(false)} />
           <div className="relative w-full md:max-w-2xl bg-[#0a0a0a] rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-12 border-t md:border border-white/10 animate-in slide-in-from-bottom duration-500 max-h-[85vh] overflow-y-auto no-scrollbar safe-bottom">
             <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-8 md:hidden" />
+            
             <div className="flex flex-col mb-10">
-              <h3 className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.4em] text-indigo-400 border-l-4 border-indigo-600 px-4">Configuración del Cerebro IA</h3>
-              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-5 mt-2">Módulos activos en el pipeline de síntesis</p>
+              <h3 className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.4em] text-indigo-400 border-l-4 border-indigo-600 px-4">Model Engine Config</h3>
+              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-5 mt-2">Selecciona el procesador neuronal</p>
             </div>
+
+            <div className="grid grid-cols-1 gap-3 mb-12">
+              <button 
+                onClick={() => handleModelChange('gemini-2.5-flash-image')}
+                className={`p-6 rounded-3xl border-2 text-left transition-all ${state.config.model === 'gemini-2.5-flash-image' ? 'bg-indigo-600/10 border-indigo-500' : 'bg-white/5 border-transparent opacity-50'}`}
+              >
+                <p className="text-[11px] font-black uppercase text-white">Gemini 2.5 Flash (Default)</p>
+                <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Alta velocidad, ideal para iteraciones rápidas de atuendos.</p>
+              </button>
+              <button 
+                onClick={() => handleModelChange('gemini-3-pro-image-preview')}
+                className={`p-6 rounded-3xl border-2 text-left transition-all ${state.config.model === 'gemini-3-pro-image-preview' ? 'bg-indigo-600/10 border-indigo-500' : 'bg-white/5 border-transparent opacity-50'}`}
+              >
+                <p className="text-[11px] font-black uppercase text-white">Gemini 3 Pro (HD Master)</p>
+                <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Máxima fidelidad, requiere API Key personal pagada. Soporta 2K/4K.</p>
+                {!hasApiKey && <span className="inline-block mt-3 px-3 py-1 bg-amber-500/20 text-amber-500 rounded text-[7px] font-black uppercase tracking-widest">Key Required</span>}
+              </button>
+            </div>
+
+            <div className="flex flex-col mb-6">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Pipeline Modules</h3>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {state.config.neuralChain.map(node => (
                 <button 
