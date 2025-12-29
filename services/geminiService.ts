@@ -3,15 +3,25 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ForgeConfig } from "../types";
 
 /**
- * Motor de Síntesis SpriteForge RPG v2.0
+ * Motor de Síntesis SpriteForge RPG v2.1
  */
 export class GeminiService {
+  /**
+   * Obtiene una instancia fresca de la API usando el entorno actual.
+   */
+  private static getClient(): GoogleGenAI {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("No API Key detected. Please select a key in the settings.");
+    }
+    return new GoogleGenAI({ apiKey });
+  }
+
   /**
    * Extracción de Maniquí Base (ADN Puro).
    */
   static async extractBaseDNA(sourceImage: string, config: ForgeConfig): Promise<string> {
-    // IMPORTANTE: Crear instancia nueva para capturar la API Key actualizada si el usuario la cambió
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = this.getClient();
 
     const systemInstruction = `
       ACT AS SPRITEFORGE BASE DNA EXTRACTOR.
@@ -42,23 +52,19 @@ export class GeminiService {
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-      throw new Error("Base extraction failed.");
+      throw new Error("Base extraction failed - No image in response.");
     } catch (error: any) {
-      if (error.message && error.message.includes("Requested entity was not found")) {
-        // Error de API Key
-        if (window.aistudio) await window.aistudio.openSelectKey();
-      }
-      throw new Error(`Neural Link Error: ${error.message}`);
+      this.handleApiError(error);
+      throw error;
     }
   }
 
   /**
-   * Síntesis Modular Evolutiva (29 Módulos Pipeline).
+   * Síntesis Modular Evolutiva.
    */
   static async synthesizeEvolution(baseImage: string, parentUrl: string | null, prompt: string, config: ForgeConfig): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = this.getClient();
     
-    // Agrupación del pipeline para el modelo
     const coreModules = config.neuralChain.filter(n => n.isActive && n.id.match(/^m[1-8]$/)).map(n => n.instruction).join('\n');
     const pixelGuard = config.neuralChain.filter(n => n.isActive && n.id.match(/^m(9|1[0-4])$/)).map(n => n.instruction).join('\n');
     const dnaLock = config.neuralChain.filter(n => n.isActive && n.id.match(/^m1[5-8]$/)).map(n => n.instruction).join('\n');
@@ -68,19 +74,11 @@ export class GeminiService {
     const systemInstruction = `
       YOU ARE THE SPRITEFORGE MODULAR ENGINE v2.0 (Mode: ${config.mode}).
       
-      [PIPELINE PHASE 1: CORE EVOLUTION]
+      [PIPELINE]
       ${coreModules}
-      
-      [PIPELINE PHASE 2: PIXELGUARD™ VALIDATION]
       ${pixelGuard}
-      
-      [PIPELINE PHASE 3: IDENTITY DNA LOCK™]
       ${dnaLock}
-      
-      [PIPELINE PHASE 4: BODY MORPHOLOGY LOCK™]
       ${bodyLock}
-      
-      [PIPELINE PHASE 5: PIXEL HARMONIZER™ POST-PROCESS]
       ${harmonizer}
 
       USER DIRECTIVE:
@@ -117,12 +115,17 @@ export class GeminiService {
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-      throw new Error("Synthesis failed to return pixel data.");
+      throw new Error("Synthesis failed - No image output.");
     } catch (error: any) {
-      if (error.message && error.message.includes("Requested entity was not found")) {
-        if (window.aistudio) await window.aistudio.openSelectKey();
-      }
-      throw new Error(`Synthesis failure: ${error.message}`);
+      this.handleApiError(error);
+      throw error;
+    }
+  }
+
+  private static handleApiError(error: any) {
+    console.error("Gemini API Error:", error);
+    if (error.message?.includes("401") || error.message?.includes("404") || error.message?.includes("API_KEY")) {
+       if (window.aistudio) window.aistudio.openSelectKey();
     }
   }
 

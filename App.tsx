@@ -24,11 +24,19 @@ const App: React.FC = () => {
     window.addEventListener('resize', handleResize);
     
     // Verificar si el usuario ya seleccionó una llave
-    if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-      window.aistudio.hasSelectedApiKey().then(setHasApiKey);
-    }
+    const checkKey = async () => {
+      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+        const has = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(has);
+      }
+    };
+    checkKey();
+    const interval = setInterval(checkKey, 2000);
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleSelectAsset = (outfit: GeneratedOutfit) => setSelectedOutfit(outfit);
@@ -50,6 +58,13 @@ const App: React.FC = () => {
       await window.aistudio.openSelectKey();
       setHasApiKey(true);
     }
+  };
+
+  const handleForgeRequest = async () => {
+    if (!hasApiKey && window.aistudio) {
+      await handleConnectKey();
+    }
+    executeSynthesis(prompt);
   };
 
   const handleModelChange = (model: ModelType) => {
@@ -159,7 +174,7 @@ const App: React.FC = () => {
             <Atelier 
               state={state} prompt={prompt} setPrompt={setPrompt}
               onUpload={uploadBaseDNA}
-              onForge={() => executeSynthesis(prompt)}
+              onForge={handleForgeRequest}
               onExtractBase={executeBaseExtraction}
               onResetParent={() => dispatch({ type: 'SET_ACTIVE_PARENT', payload: null })}
               onUpdateMutation={(v) => dispatch({ type: 'UPDATE_CONFIG', payload: { mutationStrength: v, activeMacroId: undefined } })}
@@ -211,7 +226,7 @@ const App: React.FC = () => {
               <span className="text-[7px] font-black uppercase tracking-widest">Crear</span>
             </button>
             <button onClick={() => setActiveTab('vault')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'vault' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002-2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
               <span className="text-[7px] font-black uppercase tracking-widest">Archivo</span>
             </button>
             <button onClick={() => setActiveTab('tree')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tree' ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>

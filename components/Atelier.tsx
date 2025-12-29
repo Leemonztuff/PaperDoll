@@ -212,21 +212,6 @@ export const Atelier: React.FC<AtelierProps> = ({
     </div>
   );
 
-  const ExecutionModule = () => (
-    <button 
-      onClick={onForge} disabled={state.isGenerating || !prompt}
-      className={`w-full py-5 rounded-2xl font-black text-[13px] uppercase tracking-[0.4em] text-white shadow-2xl active:scale-[0.97] transition-all shrink-0 border border-indigo-400/20 ${!prompt ? 'bg-slate-900 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 animate-pulse-slow'}`}
-    >
-      {state.isGenerating ? (
-        <div className="flex items-center justify-center gap-3">
-          <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
-      ) : (prompt ? 'Forjar Ahora' : 'Falta Descripción')}
-    </button>
-  );
-
   return (
     <div className="h-full flex flex-col md:flex-row overflow-hidden bg-black">
       {/* 1. VIEWPORT */}
@@ -320,7 +305,20 @@ export const Atelier: React.FC<AtelierProps> = ({
             <div className="h-px bg-white/5" />
             <DirectiveModule />
            </div>
-           <ExecutionModule />
+
+           {/* Feedback de error para el usuario */}
+           {state.error && (
+             <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-400 text-[9px] font-black uppercase tracking-widest animate-in shake-1 duration-300">
+               Error Neural: {state.error}
+             </div>
+           )}
+
+           <button 
+            onClick={onForge} disabled={state.isGenerating || !prompt}
+            className={`w-full py-5 rounded-2xl font-black text-[13px] uppercase tracking-[0.4em] text-white shadow-2xl active:scale-[0.97] transition-all shrink-0 border border-indigo-400/20 ${!prompt ? 'bg-slate-900 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 animate-pulse-slow'}`}
+          >
+            {state.isGenerating ? 'Generando...' : 'Forjar Ahora'}
+          </button>
         </aside>
       ) : (
         <div className={`bg-[#080808] border-t border-white/10 flex flex-col transition-all duration-700 cubic-bezier(0.2, 0, 0, 1) z-[100] safe-bottom ${isControlsExpanded ? 'h-[85vh]' : 'h-[120px]'}`}>
@@ -342,7 +340,18 @@ export const Atelier: React.FC<AtelierProps> = ({
               {mobilePhase === 'directive' ? <DirectiveModule /> : <ConfigurationModule />}
             </div>
 
-            <ExecutionModule />
+            {state.error && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-4 text-red-400 text-[8px] font-black uppercase tracking-widest">
+                Error: {state.error}
+              </div>
+            )}
+
+            <button 
+              onClick={onForge} disabled={state.isGenerating || !prompt}
+              className={`w-full py-5 rounded-2xl font-black text-[13px] uppercase tracking-[0.4em] text-white shadow-2xl active:scale-[0.97] transition-all shrink-0 border border-indigo-400/20 ${!prompt ? 'bg-slate-900 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 animate-pulse-slow'}`}
+            >
+              {state.isGenerating ? 'Generando...' : 'Forjar Ahora'}
+            </button>
           </div>
         </div>
       )}
