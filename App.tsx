@@ -15,33 +15,53 @@ const App: React.FC = () => {
   const [selectedOutfit, setSelectedOutfit] = useState<GeneratedOutfit | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [manualKey, setManualKey] = useState(localStorage.getItem('SF_API_KEY') || '');
+  const [showKey, setShowKey] = useState(false);
 
   // Verificación de la llave al montar la app
   useEffect(() => {
     const checkKey = async () => {
+      // Si hay una llave manual en localStorage, ya estamos listos
+      if (localStorage.getItem('SF_API_KEY')) {
+        setHasApiKey(true);
+        return;
+      }
+
       if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
         const has = await window.aistudio.hasSelectedApiKey();
         setHasApiKey(has);
       } else {
-        // Si no estamos en un entorno compatible, asumimos que se maneja por env directo
-        setHasApiKey(true);
+        // En Vercel, si no hay manual ni aistudio, mostramos el portal de entrada
+        setHasApiKey(false);
       }
     };
     checkKey();
-    // Re-chequeo periódico por si el usuario cambia de cuenta
     const interval = setInterval(checkKey, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSaveManualKey = (val: string) => {
+    setManualKey(val);
+    if (val.trim()) {
+      localStorage.setItem('SF_API_KEY', val.trim());
+      setHasApiKey(true);
+    } else {
+      localStorage.removeItem('SF_API_KEY');
+      setHasApiKey(false);
+    }
+  };
 
   const handleConnectKey = async () => {
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
-        // Después de abrir el diálogo, procedemos asumiendo éxito para mitigar race condition
         setHasApiKey(true);
       } catch (e) {
         console.error("Error al vincular cuenta:", e);
       }
+    } else {
+      // Si falla el objeto global, forzamos apertura de modal manual
+      setIsSetupOpen(true);
     }
   };
 
@@ -49,8 +69,8 @@ const App: React.FC = () => {
     dispatch({ type: 'UPDATE_CONFIG', payload: { model } });
   };
 
-  // Pantalla de Bienvenida si no hay llave vinculada
-  if (hasApiKey === false) {
+  // Pantalla de Bienvenida con opción Manual
+  if (hasApiKey === false && !isSetupOpen) {
     return (
       <div className="fixed inset-0 bg-[#050505] flex items-center justify-center p-6 z-[5000]">
         <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-700">
@@ -62,22 +82,32 @@ const App: React.FC = () => {
           <div className="space-y-4">
             <h1 className="text-3xl font-black uppercase tracking-tighter text-white">SpriteForge Studio</h1>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Víncula tu cuenta de Google AI Studio para activar el motor neural de generación de atuendos. Es gratuito y seguro.
+              El motor neural requiere una API Key de Gemini para funcionar. Puedes vincular tu cuenta o pegarla manualmente.
             </p>
           </div>
-          <button 
-            onClick={handleConnectKey}
-            className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all transform active:scale-95 shadow-xl"
-          >
-            Vincular Google Cloud
-          </button>
+          
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={handleConnectKey}
+              className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all transform active:scale-95 shadow-xl"
+            >
+              Vincular Google AI Studio
+            </button>
+            <button 
+              onClick={() => setIsSetupOpen(true)}
+              className="w-full py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+            >
+              Configuración Manual
+            </button>
+          </div>
+
           <div className="pt-4">
             <a 
-              href="https://ai.google.dev/gemini-api/docs/billing" 
+              href="https://aistudio.google.com/app/apikey" 
               target="_blank" 
               className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hover:text-indigo-400 transition-colors"
             >
-              Documentación sobre API Keys y Facturación
+              Consigue tu llave gratuita aquí
             </a>
           </div>
         </div>
@@ -110,9 +140,9 @@ const App: React.FC = () => {
 
         <button 
           onClick={() => setIsSetupOpen(true)}
-          className="w-12 h-12 flex items-center justify-center text-slate-600 hover:text-indigo-400 transition-colors"
+          className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${isSetupOpen ? 'bg-white/10 text-white' : 'text-slate-600 hover:text-indigo-400'}`}
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
         </button>
       </aside>
 
@@ -142,48 +172,73 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      {/* MODAL DE CONFIGURACIÓN IA */}
+      {/* MODAL DE CONFIGURACIÓN IA (MANUAL KEY SUPPORT) */}
       {isSetupOpen && (
-        <div className="fixed inset-0 z-[4000] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsSetupOpen(false)} />
-          <div className="relative max-w-lg w-full bg-[#0a0a0a] border border-white/10 rounded-[3rem] p-10 shadow-2xl overflow-hidden">
-            <h3 className="text-lg font-black uppercase tracking-[0.2em] text-white mb-8">Preferencias del Motor</h3>
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setIsSetupOpen(false)} />
+          <div className="relative max-w-lg w-full bg-[#0a0a0a] border border-white/10 rounded-[3rem] p-10 shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-lg font-black uppercase tracking-[0.2em] text-white">Configuración del Laboratorio</h3>
+              <button onClick={() => setIsSetupOpen(false)} className="text-slate-500 hover:text-white">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
             
-            <div className="space-y-6">
+            <div className="space-y-8">
               <section>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Modelo Generativo</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">API Key de Gemini</p>
+                <div className="relative">
+                  <input 
+                    type={showKey ? "text" : "password"}
+                    value={manualKey}
+                    onChange={(e) => handleSaveManualKey(e.target.value)}
+                    placeholder="Pega tu llave aquí..."
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-indigo-400 outline-none focus:border-indigo-500 transition-all pr-12"
+                  />
+                  <button 
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white"
+                  >
+                    {showKey ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-600 mt-2 uppercase tracking-widest leading-loose">
+                  Esta llave se guarda localmente en tu navegador. Úsala si el selector automático falla o si necesitas rotar cuentas.
+                </p>
+              </section>
+
+              <section>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Motor Generativo</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={() => handleModelChange('gemini-2.5-flash-image')} 
                     className={`p-4 rounded-2xl border-2 text-left transition-all ${state.config.model.includes('flash') ? 'bg-indigo-600/10 border-indigo-500 text-white' : 'bg-white/5 border-transparent opacity-40 hover:opacity-100'}`}
                   >
                     <p className="text-[11px] font-black uppercase">Flash 2.5</p>
-                    <p className="text-[8px] font-bold text-slate-400">Balanceado</p>
+                    <p className="text-[8px] font-bold text-slate-400">Rápido / Gratis</p>
                   </button>
                   <button 
                     onClick={() => handleModelChange('gemini-3-pro-image-preview')} 
                     className={`p-4 rounded-2xl border-2 text-left transition-all ${state.config.model.includes('pro') ? 'bg-indigo-600/10 border-indigo-500 text-white' : 'bg-white/5 border-transparent opacity-40 hover:opacity-100'}`}
                   >
                     <p className="text-[11px] font-black uppercase">Pro 3.0</p>
-                    <p className="text-[8px] font-bold text-slate-400">Alta Calidad</p>
+                    <p className="text-[8px] font-bold text-slate-400">Calidad Pro</p>
                   </button>
                 </div>
               </section>
 
-              <section className="bg-white/5 p-6 rounded-3xl border border-white/10 space-y-4">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] font-black text-slate-400 uppercase">Conexión Google Cloud</p>
-                   <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${hasApiKey ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                     {hasApiKey ? 'Activa' : 'Inactiva'}
-                   </div>
-                </div>
+              <div className="pt-6 border-t border-white/5">
                 <button 
                   onClick={handleConnectKey} 
-                  className="w-full py-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all"
+                  className="w-full py-4 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                 >
-                  Cambiar API Key de Sesión
+                  Intentar Vinculación Automática (Google AI)
                 </button>
-              </section>
+              </div>
             </div>
           </div>
         </div>

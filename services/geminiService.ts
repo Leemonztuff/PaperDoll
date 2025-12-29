@@ -4,11 +4,15 @@ import { ForgeConfig } from "../types";
 
 export class GeminiService {
   private static getClient(): GoogleGenAI {
-    const apiKey = process.env.API_KEY;
+    // Prioridad 1: Llave manual pegada por el usuario en el navegador
+    // Prioridad 2: Llave inyectada por el entorno (process.env)
+    const manualKey = localStorage.getItem('SF_API_KEY');
+    const apiKey = manualKey || process.env.API_KEY;
+
     if (!apiKey) {
-      throw new Error("Llave API no detectada. Por favor vincula tu cuenta de Google AI Studio.");
+      throw new Error("No hay llave API activa. Por favor, pega tu llave en Configuración.");
     }
-    // Creamos una instancia nueva cada vez para asegurar que usa la llave más reciente del diálogo
+    
     return new GoogleGenAI({ apiKey });
   }
 
@@ -54,9 +58,6 @@ export class GeminiService {
       if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
       throw new Error("Error extrayendo base.");
     } catch (error: any) {
-      if (error.message?.includes("Requested entity was not found")) {
-         // Reset state should be handled by app check
-      }
       throw error;
     }
   }
