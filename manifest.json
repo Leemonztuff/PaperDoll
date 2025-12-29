@@ -1,9 +1,9 @@
 
 {
-  "name": "SpriteForge RPG v1.5",
+  "name": "SpriteForge RPG",
   "short_name": "SpriteForge",
-  "description": "Neural Sprite Evolution Engine for RPG Assets",
-  "start_url": ".",
+  "description": "Neural Sprite Evolution Engine",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#4f46e5",
@@ -11,8 +11,7 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3593/3593963.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
