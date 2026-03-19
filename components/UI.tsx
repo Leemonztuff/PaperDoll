@@ -764,5 +764,280 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </Panel>
     </div>
-  );
-};
+  )
+}
+
+interface LayerSeparatorProps {
+  isOpen: boolean
+  onClose: () => void
+  sourceImage: string
+  onLayersExtracted: (layers: LayerData) => void
+}
+
+interface LayerData {
+  body: string
+  clothing: string
+  accessories: string
+  background: string
+}
+
+export const LayerSeparator: React.FC<LayerSeparatorProps> = ({
+  isOpen,
+  onClose,
+  sourceImage,
+  onLayersExtracted,
+}) => {
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [extractingLayer, setExtractingLayer] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  const layerDefinitions = [
+    { id: "body", label: "Body", description: "Character skin/body base" },
+    { id: "clothing", label: "Clothing", description: "Armor, clothes, fabric" },
+    { id: "accessories", label: "Accessories", description: "Weapons, helmets, items" },
+    { id: "background", label: "Background", description: "Environmental elements" },
+  ]
+
+  const handleExtractLayers = async () => {
+    setIsExtracting(true)
+    setError(null)
+    setProgress(0)
+
+    try {
+      const { GeminiService, LayerData } = await import("../services/geminiService")
+      const { DEFAULT_CONFIG } = await import("../constants")
+
+      const layers: LayerData = {
+        body: "",
+        clothing: "",
+        accessories: "",
+        background: "",
+      }
+
+      for (let i = 0; i < layerDefinitions.length; i++) {
+        const layer = layerDefinitions[i].id as keyof LayerData
+        setExtractingLayer(layerDefinitions[i].label)
+        setProgress(((i + 0.5) / layerDefinitions.length) * 100)
+
+        layers[layer] = await GeminiService.extractLayer(
+          sourceImage,
+          layer,
+          DEFAULT_CONFIG
+        )
+
+        setProgress(((i + 1) / layerDefinitions.length) * 100)
+      }
+
+      onLayersExtracted(layers)
+      onClose()
+    } catch (err: any) {
+      setError(err.message || "Failed to extract layers")
+    } finally {
+      setIsExtracting(false)
+      setExtractingLayer(null)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-[7000] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-graphite-950/90 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <Panel className="relative max-w-md w-full bg-graphite-900 border border-white/10 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-center mb-6">
+          <SectionTitle className="text-slate-200">LAYER SEPARATOR</SectionTitle>
+          <IconButton variant="ghost" onClick={onClose}>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </IconButton>
+        </div>
+
+        <div className="space-y-6">
+          <p className="text-xs text-slate-400 text-center">
+            Extract character layers as separate transparent PNGs for game development.
+          </p>
+
+          <div className="space-y-3">
+            {layerDefinitions.map((layer, index) => (
+              <div
+                key={layer.id}
+                className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${
+                  isExtracting
+                    ? "bg-graphite-800/50 border-white/5"
+                    : "bg-graphite-800/30 border-white/5 hover:border-indigo-500/30"
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+                    isExtracting
+                      ? "bg-indigo-600/20 text-indigo-400"
+                      : "bg-graphite-700 text-slate-400"
+                  }`}
+                >
+                  {index + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    {layer.label}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {layer.description}
+                  </div>
+                </div>
+                {extractingLayer === layer.label && (
+                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {isExtracting && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px]">
+                <MicroLabel>Extracting {extractingLayer}...</MicroLabel>
+                <span className="text-indigo-400 font-mono">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-graphite-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <span className="text-xs text-red-400 font-bold">{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <Button
+              variant="primary"
+              onClick={handleExtractLayers}
+              disabled={isExtracting}
+              className="w-full"
+            >
+              {isExtracting ? "EXTRACTING..." : "EXTRACT ALL LAYERS"}
+            </Button>
+            <Button variant="ghost" onClick={onClose} className="w-full">
+              CANCEL
+            </Button>
+          </div>
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+interface LayerPreviewProps {
+  layers: LayerData
+  onClose: () => void
+  onDownload: (layer: keyof LayerData) => void
+  onDownloadAll: () => void
+}
+
+export const LayerPreview: React.FC<LayerPreviewProps> = ({
+  layers,
+  onClose,
+  onDownload,
+  onDownloadAll,
+}) => {
+  const layerInfo = [
+    { id: "body" as const, label: "Body", color: "bg-rose-500" },
+    { id: "clothing" as const, label: "Clothing", color: "bg-blue-500" },
+    { id: "accessories" as const, label: "Accessories", color: "bg-amber-500" },
+    { id: "background" as const, label: "Background", color: "bg-emerald-500" },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-[7000] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-graphite-950/90 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <Panel className="relative max-w-4xl w-full bg-graphite-900 border border-white/10 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6 sticky top-0 bg-graphite-900/95 backdrop-blur-sm py-2 z-10">
+          <SectionTitle className="text-slate-200">EXTRACTED LAYERS</SectionTitle>
+          <div className="flex gap-2">
+            <Button variant="primary" onClick={onDownloadAll}>
+              DOWNLOAD ALL
+            </Button>
+            <IconButton variant="ghost" onClick={onClose}>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </IconButton>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {layerInfo.map((layer) => (
+            <div
+              key={layer.id}
+              className="relative group bg-graphite-950 rounded-xl overflow-hidden border border-white/5"
+            >
+              <div className="absolute top-2 left-2 z-10">
+                <span
+                  className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest text-white ${layer.color}`}
+                >
+                  {layer.label}
+                </span>
+              </div>
+              <div className="aspect-square flex items-center justify-center p-4">
+                <img
+                  src={layers[layer.id]}
+                  alt={layer.label}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-graphite-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => onDownload(layer.id)}
+                  className="text-[9px]"
+                >
+                  DOWNLOAD
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 text-center">
+          <p className="text-[10px] text-slate-500">
+            All layers are exported with magenta (#FF00FF) background for transparency.
+          </p>
+        </div>
+      </Panel>
+    </div>
+  )
+}

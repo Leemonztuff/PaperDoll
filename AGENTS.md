@@ -298,3 +298,61 @@ Full-featured API key configuration UI with:
 - Secure key input with show/hide toggle
 - Connection test button
 - Save/Clear functionality
+
+---
+
+## Layer Separation System
+
+### GeminiService Layer Methods (`services/geminiService.ts`)
+
+Extract character layers for game development:
+
+```typescript
+import { GeminiService, LayerData } from "./services/geminiService"
+
+// Extract a single layer
+const bodyLayer = await GeminiService.extractLayer(
+  sourceImage,
+  "body",  // "body" | "clothing" | "accessories" | "background"
+  config
+)
+
+// Extract all layers at once (4 API calls)
+const layers = await GeminiService.extractAllLayers(sourceImage, config)
+// layers: { body, clothing, accessories, background }
+```
+
+### LayerSeparator Component (`components/UI.tsx`)
+
+Modal for extracting layers with progress indicator:
+
+```tsx
+<LayerSeparator
+  isOpen={isOpen}
+  onClose={() => setIsOpen(false)}
+  sourceImage={outfitUrl}
+  onLayersExtracted={(layers) => handleLayers(layers)}
+/>
+```
+
+### LayerPreview Component (`components/UI.tsx`)
+
+Preview and download extracted layers:
+
+```tsx
+<LayerPreview
+  layers={extractedLayers}
+  onClose={() => setLayers(null)}
+  onDownload={(layerKey) => downloadLayer(layerKey)}
+  onDownloadAll={() => downloadAllLayers()}
+/>
+```
+
+### Layer Types
+
+| Layer | Description | Use Case |
+|-------|-------------|----------|
+| `body` | Character skin/base | Animation base, recoloring |
+| `clothing` | Armor, clothes | Different outfit sets |
+| `accessories` | Weapons, helmets, items | Equipment swaps |
+| `background` | Environmental elements | Scene composition |

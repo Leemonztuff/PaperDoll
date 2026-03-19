@@ -1,6 +1,15 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { ForgeConfig } from "../types";
-import { ApiKeyService, QuotaService } from "./apiKeyService";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai"
+import { ForgeConfig } from "../types"
+import { ApiKeyService, QuotaService } from "./apiKeyService"
+
+export interface LayerData {
+  body: string
+  clothing: string
+  accessories: string
+  background: string
+}
+
+export type LayerType = "body" | "clothing" | "accessories" | "background"
 
 export class GeminiService {
   private static getClient(): GoogleGenAI {
@@ -135,19 +144,111 @@ export class GeminiService {
   }
 
   static async enhancePrompt(prompt: string): Promise<string> {
-    this.checkQuota();
-    const ai = this.getClient();
+    this.checkQuota()
+    const ai = this.getClient()
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: "gemini-3-flash-preview",
         contents: `Enhance for pixel art RPG: ${prompt}`,
-      });
-      this.trackUsage();
-      return response.text?.trim() || prompt;
+      })
+      this.trackUsage()
+      return response.text?.trim() || prompt
     } catch (error: any) {
-      this.handleApiError(error);
-      throw error;
+      this.handleApiError(error)
+      throw error
     }
+  }
+
+  static async extractLayer(
+    sourceImage: string,
+    layerType: LayerType,
+    config: ForgeConfig
+  ): Promise<string> {
+    this.checkQuota()
+    const ai = this.getClient()
+
+    const layerPrompts: Record<LayerType, { system: string; user: string }> = {
+      body: {
+        system: `PIXEL ART LAYER EXTRACTOR: BODY LAYER
+Extract ONLY the character body/skin layer.
+- Remove ALL clothing, armor, weapons, accessories
+- Keep ONLY skin/body pixels
+- Background: Pure Magenta #FF00FF for transparent areas
+- Maintain exact pixel positions and proportions`,
+        user: "Extract the BODY layer only. Remove all clothing and items.",
+      },
+      clothing: {
+        system: `PIXEL ART LAYER EXTRACTOR: CLOTHING LAYER
+Extract ONLY the clothing and armor layer.
+- Remove the character body/skin (make transparent with #FF00FF)
+- Keep ONLY clothing, armor, fabric textures
+- Background: Pure Magenta #FF00FF for transparent areas
+- Maintain exact pixel positions and proportions`,
+        user: "Extract the CLOTHING layer only. Remove the body, keep only clothes.",
+      },
+      accessories: {
+        system: `PIXEL ART LAYER EXTRACTOR: ACCESSORIES LAYER
+Extract ONLY accessories: weapons, shields, helmets, jewelry, held items.
+- Remove character body and clothing
+- Keep ONLY accessories, equipment, held items
+- Background: Pure Magenta #FF00FF for transparent areas
+- Maintain exact pixel positions and proportions`,
+        user: "Extract the ACCESSORIES layer only. Keep weapons, helmets, jewelry.",
+      },
+      background: {
+        system: `PIXEL ART LAYER EXTRACTOR: BACKGROUND LAYER
+Extract ONLY the background elements.
+- Remove character, clothing, and all accessories
+- Keep ONLY background pixels
+- If no background exists, return magenta image`,
+        user: "Extract the BACKGROUND layer only. Remove character and items.",
+      },
+    }
+
+    const { system, user } = layerPrompts[layerType]
+    const mimeType = sourceImage.match(/data:([^;]+);/)?.[1] || "image/jpeg"
+
+    try {
+      const response = await ai.models.generateContent({
+        model: config.model,
+        contents: {
+          parts: [
+            { inlineData: { data: this.stripBase64(sourceImage), mimeType } },
+            { text: user },
+          ],
+        },
+        config: {
+          systemInstruction: system,
+          imageConfig: { aspectRatio: config.aspectRatio },
+        },
+      })
+
+      const imagePart = response.candidates?.[0]?.content?.parts.find(
+        (p) => p.inlineData
+      )
+      if (imagePart?.inlineData) {
+        this.trackUsage()
+        return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
+      }
+      throw new Error(`Error extracting ${layerType} layer`)
+    } catch (error: any) {
+      this.handleApiError(error)
+      throw error
+    }
+  }
+
+  static async extractAllLayers(
+    sourceImage: string,
+    config: ForgeConfig
+  ): Promise<LayerData> {
+    const [body, clothing, accessories, background] = await Promise.all([
+      this.extractLayer(sourceImage, "body", config),
+      this.extractLayer(sourceImage, "clothing", config),
+      this.extractLayer(sourceImage, "accessories", config),
+      this.extractLayer(sourceImage, "background", config),
+    ])
+
+    return { body, clothing, accessories, background }
   }
 
   static getQuotaInfo() {

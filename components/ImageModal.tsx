@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { GeneratedOutfit } from "../types";
+import React, { useState, useRef, useEffect } from "react"
+import { GeneratedOutfit } from "../types"
 import {
   IconButton,
   Button,
@@ -9,18 +9,19 @@ import {
   Tabs,
   Slider,
   ToolSection,
-} from "./UI";
-import { ImageProcessor } from "../services/ImageProcessor";
+  LayerSeparator,
+  LayerPreview,
+} from "./UI"
 
 interface ImageModalProps {
-  outfit: GeneratedOutfit;
-  onClose: () => void;
-  onDelete: (id: string) => void;
-  onSelectAsParent: (o: GeneratedOutfit) => void;
+  outfit: GeneratedOutfit
+  onClose: () => void
+  onDelete: (id: string) => void
+  onSelectAsParent: (o: GeneratedOutfit) => void
 }
 
-type BgMode = "checker" | "studio" | "void" | "bright";
-type ExportFormat = "png" | "jpeg" | "webp";
+type BgMode = "checker" | "studio" | "void" | "bright"
+type ExportFormat = "png" | "jpeg" | "webp"
 
 export const ImageModal: React.FC<ImageModalProps> = ({
   outfit,
@@ -28,9 +29,13 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   onDelete,
   onSelectAsParent,
 }) => {
-  const [zoom, setZoom] = useState(1);
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [bgMode, setBgMode] = useState<BgMode>("checker");
+  const [zoom, setZoom] = useState(1)
+  const [showMetadata, setShowMetadata] = useState(false)
+  const [bgMode, setBgMode] = useState<BgMode>("checker")
+
+  // Layer Separation State
+  const [isLayerSeparatorOpen, setIsLayerSeparatorOpen] = useState(false)
+  const [extractedLayers, setExtractedLayers] = useState<LayerData | null>(null)
 
   // Alpha Tool State
   const [isAlphaMode, setIsAlphaMode] = useState(false);
@@ -59,39 +64,59 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   }, [isAlphaMode, alphaThreshold, alphaFeather]);
 
   const handleExtractAlpha = async () => {
-    setIsProcessing(true);
+    setIsProcessing(true)
     try {
+      const { ImageProcessor } = await import("../services/ImageProcessor")
       const result = await ImageProcessor.extractAlpha(
         outfit.url,
         alphaThreshold,
-        alphaFeather,
-      );
-      setProcessedImage(result);
+        alphaFeather
+      )
+      setProcessedImage(result)
     } catch (err) {
-      console.error("Alpha extraction failed", err);
+      console.error("Alpha extraction failed", err)
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false)
     }
-  };
+  }
 
   const handleDownload = async () => {
-    setIsExporting(true);
+    setIsExporting(true)
     try {
+      const { ImageProcessor } = await import("../services/ImageProcessor")
       const finalImage = await ImageProcessor.exportImage(
         displayImage,
         exportFormat,
-        exportBgColor,
-      );
-      const link = document.createElement("a");
-      link.href = finalImage;
-      link.download = `${assetName}.${exportFormat === "jpeg" ? "jpg" : exportFormat}`;
-      link.click();
+        exportBgColor
+      )
+      const link = document.createElement("a")
+      link.href = finalImage
+      link.download = `${assetName}.${exportFormat === "jpeg" ? "jpg" : exportFormat}`
+      link.click()
     } catch (err) {
-      console.error("Export failed", err);
+      console.error("Export failed", err)
     } finally {
-      setIsExporting(false);
+      setIsExporting(false)
     }
-  };
+  }
+
+  const handleDownloadLayer = (layerKey: keyof LayerData) => {
+    if (!extractedLayers) return
+    const link = document.createElement("a")
+    link.href = extractedLayers[layerKey]
+    link.download = `${assetName}-${layerKey}.png`
+    link.click()
+  }
+
+  const handleDownloadAllLayers = () => {
+    if (!extractedLayers) return
+    const layerKeys = ["body", "clothing", "accessories", "background"] as const
+    layerKeys.forEach((key) => {
+      setTimeout(() => {
+        handleDownloadLayer(key)
+      }, 100)
+    })
+  }
 
   const getBgClass = () => {
     switch (bgMode) {
@@ -442,19 +467,47 @@ export const ImageModal: React.FC<ImageModalProps> = ({
               >
                 {isExporting ? "EXPORTING..." : "EXPORT ASSET"}
               </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() => setIsLayerSeparatorOpen(true)}
+                className="w-full py-3 mt-3"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+                LAYER SEPARATOR
+              </Button>
             </ToolSection>
           </aside>
         )}
       </div>
-    </div>
-  );
-};
 
-const SpecItem = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center justify-between border-b border-white/[0.03] pb-2">
-    <MicroLabel>{label}</MicroLabel>
-    <span className="text-[9px] font-bold text-white uppercase tracking-widest">
-      {value}
-    </span>
-  </div>
-);
+      <LayerSeparator
+        isOpen={isLayerSeparatorOpen}
+        onClose={() => setIsLayerSeparatorOpen(false)}
+        sourceImage={outfit.url}
+        onLayersExtracted={setExtractedLayers}
+      />
+
+      {extractedLayers && (
+        <LayerPreview
+          layers={extractedLayers}
+          onClose={() => setExtractedLayers(null)}
+          onDownload={handleDownloadLayer}
+          onDownloadAll={handleDownloadAllLayers}
+        />
+      )}
+    </div>
+  )
+}
