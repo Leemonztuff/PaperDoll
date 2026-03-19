@@ -1,7 +1,7 @@
 import { ForgeConfig } from "../types"
 import type { ProviderId, LayerData, LayerType, IImageProvider, ProviderInfo } from "./providers/baseProvider"
 import { PROVIDER_INFO } from "./providers/baseProvider"
-import { googleProvider, huggingFaceProvider, openRouterProvider } from "./providers"
+import { googleProvider, huggingFaceProvider, openRouterProvider, stabilityProvider } from "./providers"
 
 export type { LayerData, LayerType, ProviderId, ProviderInfo }
 export { PROVIDER_INFO }
@@ -15,6 +15,8 @@ export class ImageService {
         return huggingFaceProvider
       case "openrouter":
         return openRouterProvider
+      case "stability":
+        return stabilityProvider
       default:
         throw new Error(`Unknown provider: ${providerId}`)
     }
@@ -85,6 +87,6 @@ export class ImageService {
   }
 
   static getAllProviders(): ProviderId[] {
-    return ["google", "huggingface", "openrouter"]
+    return ["google", "huggingface", "openrouter", "stability"]
   }
 }

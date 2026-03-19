@@ -12,6 +12,7 @@ export interface ProviderKeys {
   google?: ProviderKeyData
   huggingface?: ProviderKeyData
   openrouter?: ProviderKeyData
+  stability?: ProviderKeyData
 }
 
 export interface ProviderStatus {
@@ -43,7 +44,7 @@ export class ApiKeyService {
 
   static getActiveProvider(): ProviderId | null {
     const stored = localStorage.getItem(ACTIVE_PROVIDER_STORAGE) as ProviderId | null
-    if (stored && ["google", "huggingface", "openrouter"].includes(stored)) {
+    if (stored && ["google", "huggingface", "openrouter", "stability"].includes(stored)) {
       return stored
     }
     return null
@@ -107,12 +108,13 @@ export class ApiKeyService {
   static getStatus(): ApiKeyStatus {
     const keys = this.getAllKeys()
     const activeProvider = this.getActiveProvider()
-    const allProviders: ProviderId[] = ["google", "huggingface", "openrouter"]
+    const allProviders: ProviderId[] = ["google", "huggingface", "openrouter", "stability"]
 
     const providerStatuses: Record<ProviderId, ProviderStatus> = {
       google: { providerId: "google", hasKey: false, keyEnabled: false, isValid: false },
       huggingface: { providerId: "huggingface", hasKey: false, keyEnabled: false, isValid: false },
       openrouter: { providerId: "openrouter", hasKey: false, keyEnabled: false, isValid: false },
+      stability: { providerId: "stability", hasKey: false, keyEnabled: false, isValid: false },
     }
 
     let hasAnyKey = false

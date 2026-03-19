@@ -1,6 +1,6 @@
 import { ForgeConfig } from "../../types"
 
-export type ProviderId = "google" | "huggingface" | "openrouter"
+export type ProviderId = "google" | "huggingface" | "openrouter" | "stability"
 
 export type LayerData = {
   body: string
@@ -139,6 +139,22 @@ export const DEFAULT_PROMPTS: Record<ProviderId, ProviderPrompts> = {
     extractBackground:
       "PIXEL ART LAYER EXTRACTOR: BACKGROUND LAYER. Extract ONLY the background elements. Remove character, clothing, and all accessories. Keep ONLY background pixels. If no background exists, return magenta image.",
   },
+  stability: {
+    baseMannequin:
+      "Professional RPG character base mannequin, front view, T-pose, NO hair, NO clothes, NO equipment, neutral gray body, pixel art style, magenta background",
+    extractDNA:
+      "Strip all clothing, armor, hair and items from the character. Return ONLY a clean humanoid base mannequin. Pixel art RPG style. Magenta background.",
+    synthesize:
+      "Apply the described clothing to the character while maintaining exact body pose and proportions. Pixel art RPG style. Magenta #FF00FF background.",
+    extractBody:
+      "Extract ONLY the body/skin layer. Remove all clothing, armor, items. Pixel art style. Magenta #FF00FF transparent background.",
+    extractClothing:
+      "Extract ONLY clothing and armor layer. Remove body/skin. Keep only fabric and armor. Pixel art style. Magenta #FF00FF transparent background.",
+    extractAccessories:
+      "Extract ONLY accessories: weapons, helmets, jewelry. Remove body and clothing. Pixel art style. Magenta #FF00FF transparent background.",
+    extractBackground:
+      "Extract ONLY background elements. Remove character and all items. Pixel art style.",
+  },
 }
 
 export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
@@ -165,5 +181,13 @@ export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
     model: "google/gemini-2.5-flash-image-preview",
     freeTier: "Variable by model",
     website: "https://openrouter.ai",
+  },
+  stability: {
+    id: "stability",
+    name: "Stability AI",
+    description: "Unlimited img2img with Community License",
+    model: "stable-diffusion-xl-1024-v1-0",
+    freeTier: "UNLIMITED*",
+    website: "https://platform.stability.ai",
   },
 }
