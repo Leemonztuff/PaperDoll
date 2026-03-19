@@ -1,2 +1,3 @@
-// Deprecated: Component integrated into App.tsx.
+
+// Archivo eliminado para resolver SyntaxError de módulos.
 export {};

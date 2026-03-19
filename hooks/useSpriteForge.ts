@@ -61,6 +61,19 @@ export function useSpriteForge() {
     dispatch({ type: 'SET_BASE_IMAGE', payload: url });
   }, []);
 
+  const generateMannequin = useCallback(async () => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    try {
+      const mannequin = await GeminiService.generateBaseMannequin(state.config);
+      dispatch({ type: 'SET_BASE_IMAGE', payload: mannequin });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, [state.config]);
+
   const executeBaseExtraction = useCallback(async (imageUrl: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -116,6 +129,7 @@ export function useSpriteForge() {
     state,
     dispatch,
     uploadBaseDNA,
+    generateMannequin,
     executeBaseExtraction,
     executeSynthesis,
     deleteAsset
