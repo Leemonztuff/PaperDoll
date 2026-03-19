@@ -512,3 +512,257 @@ export const Loader: React.FC<{ message?: string; subMessage?: string }> = ({
     </div>
   </div>
 );
+
+interface SettingsPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  status: {
+    hasKey: boolean;
+    keySource: "none" | "manual" | "environment";
+    tier: "free" | "pro";
+    isValid: boolean;
+  };
+  quota: {
+    requestsUsed: number;
+    requestsLimit: number;
+    isUnlimited: boolean;
+  };
+  remainingRequests: number;
+  isQuotaExceeded: boolean;
+  quotaPercentage: number;
+  manualKey: string;
+  showKey: boolean;
+  isTesting: boolean;
+  testResult: { success: boolean; error?: string } | null;
+  onManualKeyChange: (key: string) => void;
+  onSaveKey: () => void;
+  onClearKey: () => void;
+  onToggleShowKey: () => void;
+  onTestConnection: () => Promise<void>;
+}
+
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  isOpen,
+  onClose,
+  status,
+  quota,
+  remainingRequests,
+  isQuotaExceeded,
+  quotaPercentage,
+  manualKey,
+  showKey,
+  isTesting,
+  testResult,
+  onManualKeyChange,
+  onSaveKey,
+  onClearKey,
+  onToggleShowKey,
+  onTestConnection,
+}) => {
+  if (!isOpen) return null;
+
+  const getTierBadge = () => {
+    if (status.tier === "pro") {
+      return (
+        <span className="px-2 py-1 bg-indigo-600/20 border border-indigo-500/30 rounded-lg text-[9px] font-bold uppercase tracking-widest text-indigo-300">
+          PRO TIER
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-1 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-[9px] font-bold uppercase tracking-widest text-emerald-300">
+        FREE TIER
+      </span>
+    );
+  };
+
+  const getStatusIndicator = () => {
+    if (!status.hasKey) {
+      return (
+        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <MicroLabel color="text-red-400">NO API KEY CONFIGURED</MicroLabel>
+        </div>
+      );
+    }
+    if (status.keySource === "manual") {
+      return (
+        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          <MicroLabel color="text-emerald-400">CUSTOM KEY ACTIVE</MicroLabel>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+        <MicroLabel color="text-indigo-400">ENVIRONMENT KEY</MicroLabel>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-graphite-950/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <Panel className="relative max-w-lg w-full bg-graphite-900 border border-white/10 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <SectionTitle className="text-slate-200">ENGINE CALIBRATION</SectionTitle>
+            {getTierBadge()}
+          </div>
+          <IconButton variant="ghost" onClick={onClose}>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </IconButton>
+        </div>
+
+        <div className="space-y-6">
+          <ToolSection title="API Key Status">{getStatusIndicator()}</ToolSection>
+
+          <ToolSection title="Usage Quota">
+            <div className="space-y-4">
+              {status.hasKey && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <MicroLabel>
+                      {quota.isUnlimited ? "UNLIMITED" : `${remainingRequests} requests remaining`}
+                    </MicroLabel>
+                    <span className="text-[10px] font-mono text-indigo-300">
+                      {quota.isUnlimited ? "∞" : `${quota.requestsUsed}/${quota.requestsLimit}`}
+                    </span>
+                  </div>
+                  {!quota.isUnlimited && (
+                    <div className="w-full h-2 bg-graphite-950 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          quotaPercentage > 80
+                            ? "bg-red-500"
+                            : quotaPercentage > 50
+                              ? "bg-amber-500"
+                              : "bg-indigo-500"
+                        }`}
+                        style={{ width: `${quotaPercentage}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {!status.hasKey && (
+                <p className="text-xs text-slate-400">
+                  Configure an API key below to start generating assets.
+                  Free tier includes limited requests per day.
+                </p>
+              )}
+            </div>
+          </ToolSection>
+
+          <ToolSection title="API Key Configuration">
+            <div className="space-y-4">
+              <div className="relative">
+                <input
+                  type={showKey ? "text" : "password"}
+                  value={manualKey}
+                  onChange={(e) => onManualKeyChange(e.target.value)}
+                  placeholder="Paste your nanobanana API key here..."
+                  className="w-full bg-graphite-950 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-indigo-500/50 focus:bg-graphite-900 outline-none transition-all font-mono placeholder:text-slate-600 pr-12"
+                />
+                <button
+                  onClick={onToggleShowKey}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showKey ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {testResult && (
+                <div
+                  className={`p-3 rounded-xl ${
+                    testResult.success
+                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                      : "bg-red-500/10 border border-red-500/20"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {testResult.success ? (
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    <span className={`text-xs font-bold ${
+                      testResult.success ? "text-emerald-400" : "text-red-400"
+                    }`}>
+                      {testResult.success ? "Connection successful!" : testResult.error || "Connection failed"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  onClick={onTestConnection}
+                  disabled={isTesting || manualKey.length < 10}
+                  className="flex-1"
+                >
+                  {isTesting ? "TESTING..." : "TEST CONNECTION"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={onSaveKey}
+                  disabled={manualKey.length < 10}
+                >
+                  SAVE
+                </Button>
+                <Button variant="danger" onClick={onClearKey}>
+                  CLEAR
+                </Button>
+              </div>
+            </div>
+          </ToolSection>
+
+          <ToolSection title="Billing">
+            <a
+              href="https://ai.google.dev/gemini-api/docs/billing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-center text-[10px] text-indigo-400 hover:text-indigo-300 underline uppercase tracking-widest font-bold"
+            >
+              Billing Documentation
+            </a>
+          </ToolSection>
+
+          <Button variant="glass" onClick={onClose} className="w-full">
+            CLOSE
+          </Button>
+        </div>
+      </Panel>
+    </div>
+  );
+};

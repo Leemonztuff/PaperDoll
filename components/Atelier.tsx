@@ -36,6 +36,7 @@ interface AtelierProps {
   onPromoteToBase: (url: string) => void;
   onGenerateMannequin: () => void;
   hasApiKey: boolean;
+  isQuotaExceeded: boolean;
 }
 
 export const Atelier: React.FC<AtelierProps> = ({
@@ -53,6 +54,7 @@ export const Atelier: React.FC<AtelierProps> = ({
   onPromoteToBase,
   onGenerateMannequin,
   hasApiKey,
+  isQuotaExceeded,
 }) => {
   const [isAlchemizing, setIsAlchemizing] = useState(false);
   const [showModules, setShowModules] = useState(false);
@@ -321,10 +323,10 @@ export const Atelier: React.FC<AtelierProps> = ({
           <Button
             variant="primary"
             onClick={onForge}
-            disabled={state.isGenerating || !prompt}
+            disabled={state.isGenerating || !prompt || isQuotaExceeded || !hasApiKey}
             className="w-full"
           >
-            {state.isGenerating ? "FORGING..." : "FORGE ASSET"}
+            {isQuotaExceeded ? "QUOTA EXCEEDED" : !hasApiKey ? "CONFIGURE API KEY" : state.isGenerating ? "FORGING..." : "FORGE ASSET"}
           </Button>
         </div>
       </div>

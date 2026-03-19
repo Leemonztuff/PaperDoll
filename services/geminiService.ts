@@ -1,13 +1,10 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ForgeConfig } from "../types";
+import { ApiKeyService, QuotaService } from "./apiKeyService";
 
 export class GeminiService {
-  /**
-   * Obtiene el cliente de IA utilizando exclusivamente la variable de entorno API_KEY.
-   */
   private static getClient(): GoogleGenAI {
-    const apiKey = process.env.API_KEY;
+    const apiKey = ApiKeyService.getKey();
 
     if (!apiKey) {
       throw new Error("API_KEY_MISSING");
@@ -15,7 +12,18 @@ export class GeminiService {
     return new GoogleGenAI({ apiKey });
   }
 
+  private static checkQuota(): void {
+    if (QuotaService.isQuotaExceeded()) {
+      throw new Error("QUOTA_EXCEEDED");
+    }
+  }
+
+  private static trackUsage(): void {
+    QuotaService.incrementUsage();
+  }
+
   static async generateBaseMannequin(config: ForgeConfig): Promise<string> {
+    this.checkQuota();
     const ai = this.getClient();
     const prompt = "Create a professional RPG base character mannequin. Front view, T-pose or neutral standing, NO HAIR, NO CLOTHES, NO EQUIPMENT. Simple neutral gray or skin-tone anatomical base. High-quality 16-bit Pixel Art. Background: Magenta #FF00FF for transparency.";
     
@@ -30,7 +38,10 @@ export class GeminiService {
       });
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      if (imagePart?.inlineData) {
+        this.trackUsage();
+        return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      }
       throw new Error("No se pudo generar el maniquí.");
     } catch (error: any) {
       this.handleApiError(error);
@@ -39,6 +50,7 @@ export class GeminiService {
   }
 
   static async extractBaseDNA(sourceImage: string, config: ForgeConfig): Promise<string> {
+    this.checkQuota();
     const ai = this.getClient();
     const systemInstruction = `
       GAME-READY ASSET ENGINE: DNA EXTRACTOR.
@@ -64,7 +76,10 @@ export class GeminiService {
       });
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      if (imagePart?.inlineData) {
+        this.trackUsage();
+        return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      }
       throw new Error("Error extrayendo base.");
     } catch (error: any) {
       this.handleApiError(error);
@@ -73,6 +88,7 @@ export class GeminiService {
   }
 
   static async synthesizeEvolution(baseImage: string, parentUrl: string | null, prompt: string, config: ForgeConfig): Promise<string> {
+    this.checkQuota();
     const ai = this.getClient();
     const systemInstruction = `
       GAME-READY ASSET ENGINE: OUTFIT FORGE.
@@ -107,7 +123,10 @@ export class GeminiService {
       });
 
       const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (imagePart?.inlineData) return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      if (imagePart?.inlineData) {
+        this.trackUsage();
+        return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      }
       throw new Error("La síntesis falló.");
     } catch (error: any) {
       this.handleApiError(error);
@@ -116,13 +135,14 @@ export class GeminiService {
   }
 
   static async enhancePrompt(prompt: string): Promise<string> {
+    this.checkQuota();
     const ai = this.getClient();
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Enhance for pixel art RPG: ${prompt}`,
       });
-      // Extract text using property access as per guidelines
+      this.trackUsage();
       return response.text?.trim() || prompt;
     } catch (error: any) {
       this.handleApiError(error);
@@ -130,10 +150,25 @@ export class GeminiService {
     }
   }
 
+  static getQuotaInfo() {
+    return QuotaService.getQuota();
+  }
+
+  static getRemainingRequests(): number {
+    return QuotaService.getRemainingRequests();
+  }
+
+  static isQuotaExceeded(): boolean {
+    return QuotaService.isQuotaExceeded();
+  }
+
   private static handleApiError(error: any) {
     console.error("Gemini Error:", error);
     if (error.message?.includes("403") || error.message?.includes("401") || error.message?.includes("Requested entity was not found")) {
       throw new Error("RESELECT_KEY");
+    }
+    if (error.message?.includes("429") || error.message?.includes("quota")) {
+      throw new Error("QUOTA_EXCEEDED");
     }
     throw error;
   }
