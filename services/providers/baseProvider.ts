@@ -153,8 +153,8 @@ export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
   huggingface: {
     id: "huggingface",
     name: "Hugging Face",
-    description: "FLUX and Stable Diffusion models",
-    model: "black-forest-labs/FLUX.1-dev",
+    description: "FLUX Kontext for img2img, FLUX Dev for txt2img",
+    model: "black-forest-labs/FLUX.1-Kontext-dev",
     freeTier: "~100 requests/hour",
     website: "https://huggingface.co",
   },

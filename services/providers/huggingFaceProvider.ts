@@ -11,11 +11,14 @@ import {
 
 const HF_API_URL = "https://api-inference.huggingface.co/models"
 
+const HF_MODELS = {
+  txt2img: "black-forest-labs/FLUX.1-dev",
+  img2img: "black-forest-labs/FLUX.1-Kontext-dev",
+}
+
 export class HuggingFaceProvider implements IImageProvider {
   readonly id: ProviderId = "huggingface"
   readonly info: ProviderInfo = PROVIDER_INFO.huggingface
-
-  private model = "black-forest-labs/FLUX.1-dev"
 
   private stripBase64(url: string): string {
     return url.split(",")[1] || url
@@ -33,7 +36,7 @@ export class HuggingFaceProvider implements IImageProvider {
 
   async testConnection(apiKey: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${HF_API_URL}/stabilityai/stable-diffusion-xl-base-1.0`, {
+      const response = await fetch(`${HF_API_URL}/${HF_MODELS.img2img}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -45,12 +48,12 @@ export class HuggingFaceProvider implements IImageProvider {
         }),
       })
 
-      if (response.ok) {
+      if (response.ok || response.status === 406) {
         return { success: true }
       }
 
       const errorText = await response.text()
-      if (errorText.includes("incorrect api key")) {
+      if (errorText.toLowerCase().includes("incorrect") || errorText.toLowerCase().includes("invalid")) {
         return { success: false, error: "Invalid API key" }
       }
       return { success: false, error: `API error: ${response.status}` }
@@ -62,30 +65,40 @@ export class HuggingFaceProvider implements IImageProvider {
   private async generateImage(
     apiKey: string,
     prompt: string,
-    negativePrompt?: string
+    negativePrompt?: string,
+    sourceImage?: string
   ): Promise<string> {
-    const response = await fetch(`${HF_API_URL}/${this.model}`, {
+    const model = sourceImage ? HF_MODELS.img2img : HF_MODELS.txt2img
+    
+    const payload: Record<string, unknown> = {
+      inputs: sourceImage || prompt,
+      parameters: {
+        guidance_scale: 3.5,
+        num_inference_steps: 50,
+        max_sequence_length: 512,
+      },
+      options: { wait_for_model: true, use_cache: false },
+    }
+
+    if (sourceImage) {
+      payload.parameters.prompt = prompt
+      if (negativePrompt) {
+        payload.parameters.negative_prompt = negativePrompt
+      }
+    }
+
+    const response = await fetch(`${HF_API_URL}/${model}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          negative_prompt: negativePrompt || "blurry, low quality, distorted",
-          guidance_scale: 7.5,
-          num_inference_steps: 30,
-          width: 1024,
-          height: 1024,
-        },
-        options: { wait_for_model: true, use_cache: false },
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`HF API Error: ${errorText}`)
+      throw new Error(`HF API Error: ${response.status} - ${errorText}`)
     }
 
     const blob = await response.blob()
@@ -107,7 +120,12 @@ export class HuggingFaceProvider implements IImageProvider {
     config: ForgeConfig
   ): Promise<string> {
     const prompts = DEFAULT_PROMPTS.huggingface
-    return this.generateImage(apiKey, prompts.extractDNA)
+    return this.generateImage(
+      apiKey,
+      prompts.extractDNA,
+      "blurry, low quality, distorted, clothing, armor, hair",
+      sourceImage
+    )
   }
 
   async synthesizeEvolution(
@@ -117,8 +135,13 @@ export class HuggingFaceProvider implements IImageProvider {
     prompt: string,
     config: ForgeConfig
   ): Promise<string> {
-    const fullPrompt = `${prompt}, pixel art RPG character, maintain proportions, 16-bit game style`
-    return this.generateImage(apiKey, fullPrompt)
+    const fullPrompt = `${prompt}. Keep the exact same body pose, proportions, and silhouette. 16-bit pixel art RPG style.`
+    return this.generateImage(
+      apiKey,
+      fullPrompt,
+      "blurry, low quality, distorted, deformed",
+      baseImage
+    )
   }
 
   async extractLayer(
@@ -128,13 +151,27 @@ export class HuggingFaceProvider implements IImageProvider {
     config: ForgeConfig
   ): Promise<string> {
     const prompts = DEFAULT_PROMPTS.huggingface
-    const layerPrompts: Record<LayerType, string> = {
-      body: prompts.extractBody,
-      clothing: prompts.extractClothing,
-      accessories: prompts.extractAccessories,
-      background: prompts.extractBackground,
+    const layerPrompts: Record<LayerType, { positive: string; negative: string }> = {
+      body: {
+        positive: prompts.extractBody,
+        negative: "clothing, armor, weapons, accessories, items, fabric",
+      },
+      clothing: {
+        positive: prompts.extractClothing,
+        negative: "body, skin, person, character, face",
+      },
+      accessories: {
+        positive: prompts.extractAccessories,
+        negative: "body, skin, clothing, fabric",
+      },
+      background: {
+        positive: prompts.extractBackground,
+        negative: "character, person, body, clothing",
+      },
     }
-    return this.generateImage(apiKey, layerPrompts[layerType])
+    
+    const { positive, negative } = layerPrompts[layerType]
+    return this.generateImage(apiKey, positive, negative, sourceImage)
   }
 
   async extractAllLayers(
