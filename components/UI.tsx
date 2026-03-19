@@ -517,12 +517,12 @@ export const Loader: React.FC<{ message?: string; subMessage?: string }> = ({
 interface SettingsPanelProps {
   isOpen: boolean
   onClose: () => void
-  activeProvider: "google" | "huggingface" | "openrouter" | null
+  activeProvider: "google" | "huggingface" | "openrouter" | "stability" | null
   providerKeys: Record<string, { hasKey: boolean; keyEnabled: boolean }>
   currentKeyInput: string
   isTesting: boolean
   testResult: { success: boolean; error?: string } | null
-  onProviderChange: (provider: "google" | "huggingface" | "openrouter") => void
+  onProviderChange: (provider: "google" | "huggingface" | "openrouter" | "stability") => void
   onKeyChange: (key: string) => void
   onSave: () => void
   onClear: () => void
@@ -540,16 +540,23 @@ const PROVIDERS = [
   {
     id: "huggingface" as const,
     name: "Hugging Face",
-    description: "FLUX / Stable Diffusion",
+    description: "FLUX Kontext",
     icon: "🤗",
     color: "from-orange-500 to-yellow-500",
   },
   {
     id: "openrouter" as const,
     name: "OpenRouter",
-    description: "Gemini via OpenRouter",
+    description: "Gemini via gateway",
     icon: "🌐",
     color: "from-purple-500 to-pink-500",
+  },
+  {
+    id: "stability" as const,
+    name: "Stability AI",
+    description: "Unlimited SDXL",
+    icon: "🎨",
+    color: "from-red-500 to-pink-500",
   },
 ]
 
@@ -784,6 +791,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div>
                   <div className="text-xs font-bold text-purple-300">OpenRouter</div>
                   <div className="text-[10px] text-slate-400">Multiple models</div>
+                </div>
+              </a>
+
+              <a
+                href="https://platform.stability.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
+              >
+                <span className="text-xl">🎨</span>
+                <div>
+                  <div className="text-xs font-bold text-red-300">Stability AI</div>
+                  <div className="text-[10px] text-slate-400">UNLIMITED img2img</div>
                 </div>
               </a>
             </div>
