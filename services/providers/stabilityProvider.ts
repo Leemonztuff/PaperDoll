@@ -58,23 +58,23 @@ export class StabilityProvider implements IImageProvider {
     prompt: string,
     sourceImage?: string
   ): Promise<string> {
-    const payload: Record<string, unknown> = {
-      prompt: prompt,
-      negative_prompt: "blurry, low quality, distorted, deformed, bad anatomy",
-      output_format: { type: "png" },
-    }
+    const formData = new FormData()
+
+    formData.append("prompt", prompt)
+    formData.append("negative_prompt", "blurry, low quality, distorted, deformed, bad anatomy")
 
     if (sourceImage) {
-      payload.image = this.stripBase64(sourceImage)
+      const imageBuffer = Uint8Array.from(atob(this.stripBase64(sourceImage)), c => c.charCodeAt(0))
+      const imageBlob = new Blob([imageBuffer], { type: "image/png" })
+      formData.append("image", imageBlob, "image.png")
     }
 
     const response = await fetch(`${STABILITY_API_URL}/generation/${STABILITY_ENGINE}/image-to-image`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: formData,
     })
 
     if (!response.ok) {
