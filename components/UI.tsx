@@ -747,15 +747,77 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </ToolSection>
 
-          <ToolSection title="Billing">
-            <a
-              href="https://ai.google.dev/gemini-api/docs/billing"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-center text-[10px] text-indigo-400 hover:text-indigo-300 underline uppercase tracking-widest font-bold"
-            >
-              Billing Documentation
-            </a>
+          <ToolSection title="Get Your API Key">
+            <div className="space-y-4">
+              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Quick Setup Guide</span>
+                </div>
+                <ol className="text-[11px] text-slate-300 space-y-2 list-decimal list-inside">
+                  <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline font-bold">Google AI Studio</a></li>
+                  <li>Sign in with your Google account</li>
+                  <li>Click "Get API Key" in the sidebar</li>
+                  <li>Create a new API key or copy an existing one</li>
+                  <li>Paste the key above and click "Test Connection"</li>
+                </ol>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="https://aistudio.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-graphite-800 hover:bg-graphite-700 border border-white/10 rounded-xl text-[10px] font-bold text-slate-300 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  AI Studio
+                </a>
+                <a
+                  href="https://ai.google.dev/gemini-api/docs/billing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-graphite-800 hover:bg-graphite-700 border border-white/10 rounded-xl text-[10px] font-bold text-slate-300 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  Pricing
+                </a>
+              </div>
+
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Free Tier Benefits</span>
+                </div>
+                <ul className="text-[10px] text-slate-400 space-y-1">
+                  <li>• <span className="text-emerald-400 font-bold">500 requests/day</span> free with Gemini 2.5 Flash</li>
+                  <li>• No credit card required</li>
+                  <li>• Image generation included</li>
+                </ul>
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7m14 13V7a2 2 0 00-2-2h-6l2 6h6l-2-6m-6 0V5a2 2 0 10-4 0v6l2 6h6l2-6V11a2 2 0 10-4 0" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Pro Tier (Paid)</span>
+                </div>
+                <ul className="text-[10px] text-slate-400 space-y-1">
+                  <li>• Access to Gemini 3 Pro Image model</li>
+                  <li>• Higher quality outputs</li>
+                  <li>• ~$0.134 per image generated</li>
+                </ul>
+              </div>
+            </div>
           </ToolSection>
 
           <Button variant="glass" onClick={onClose} className="w-full">
