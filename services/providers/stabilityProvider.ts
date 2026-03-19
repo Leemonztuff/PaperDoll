@@ -11,7 +11,7 @@ import {
 
 const STABILITY_API_URL = "https://api.stability.ai/v1"
 
-const STABILITY_ENGINE = "stable-diffusion-xl-1024-v1-0"
+const STABILITY_ENGINE = "stable-diffusion-xl-turbo-v2-1"
 
 export class StabilityProvider implements IImageProvider {
   readonly id: ProviderId = "stability"
@@ -33,7 +33,7 @@ export class StabilityProvider implements IImageProvider {
 
   async testConnection(apiKey: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${STABILITY_API_URL}/user/balance`, {
+      const response = await fetch(`${STABILITY_API_URL}/account/balance`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },
@@ -64,11 +64,10 @@ export class StabilityProvider implements IImageProvider {
       const imageBuffer = Uint8Array.from(atob(this.stripBase64(sourceImage)), c => c.charCodeAt(0))
       const imageBlob = new Blob([imageBuffer], { type: "image/png" })
       formData.append("init_image", imageBlob, "image.png")
-      formData.append("image_strength", "0.35")
     }
 
     formData.append("prompt", prompt)
-    formData.append("neg_prompt", "blurry, low quality, distorted, deformed, bad anatomy, watermark, text")
+    formData.append("negative_prompt", "blurry, low quality, distorted, deformed, bad anatomy")
 
     const response = await fetch(`${STABILITY_API_URL}/generation/${STABILITY_ENGINE}/image-to-image`, {
       method: "POST",
@@ -79,8 +78,8 @@ export class StabilityProvider implements IImageProvider {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(`Stability AI Error: ${response.status} - ${errorData.message || "Unknown error"}`)
+      const errorText = await response.text()
+      throw new Error(`Stability AI Error: ${response.status} - ${errorText}`)
     }
 
     const result = await response.json()
