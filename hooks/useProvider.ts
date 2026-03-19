@@ -50,6 +50,7 @@ export function useProvider(): UseProviderReturn {
       ApiKeyService.setActiveProvider(providerId)
       setActiveProviderState(providerId)
       setTestResult(null)
+      setCurrentKeyInput("")
     },
     []
   )
@@ -57,6 +58,8 @@ export function useProvider(): UseProviderReturn {
   const saveCurrentKey = useCallback(() => {
     if (activeProvider && currentKeyInput.trim().length > 10) {
       ApiKeyService.setKey(activeProvider, currentKeyInput)
+      ApiKeyService.setActiveProvider(activeProvider)
+      setActiveProviderState(activeProvider)
       refreshStatus()
       setCurrentKeyInput("")
       setTestResult(null)
@@ -83,6 +86,8 @@ export function useProvider(): UseProviderReturn {
 
       if (result.success) {
         ApiKeyService.setKey(activeProvider, currentKeyInput)
+        ApiKeyService.setActiveProvider(activeProvider)
+        setActiveProviderState(activeProvider)
         refreshStatus()
         setCurrentKeyInput("")
       }
