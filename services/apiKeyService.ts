@@ -1,193 +1,202 @@
-const API_KEY_STORAGE = "PAPERDOLL_API_KEY";
-const QUOTA_STORAGE = "PAPERDOLL_QUOTA";
+import { ProviderId, PROVIDER_INFO } from "./providers"
 
-export interface QuotaInfo {
-  requestsUsed: number;
-  requestsLimit: number;
-  lastReset: number;
-  isUnlimited: boolean;
+const PROVIDERS_STORAGE = "PAPERDOLL_PROVIDERS"
+const ACTIVE_PROVIDER_STORAGE = "PAPERDOLL_ACTIVE_PROVIDER"
+
+export interface ProviderKeyData {
+  key: string
+  enabled: boolean
+}
+
+export interface ProviderKeys {
+  google?: ProviderKeyData
+  huggingface?: ProviderKeyData
+  openrouter?: ProviderKeyData
+}
+
+export interface ProviderStatus {
+  providerId: ProviderId
+  hasKey: boolean
+  keyEnabled: boolean
+  isValid: boolean
 }
 
 export interface ApiKeyStatus {
-  hasKey: boolean;
-  keySource: "none" | "manual" | "environment";
-  tier: "free" | "pro";
-  isValid: boolean;
+  activeProvider: ProviderId | null
+  providers: Record<ProviderId, ProviderStatus>
+  hasAnyKey: boolean
+  currentKey: string | null
 }
 
 export class ApiKeyService {
-  static getStorageKey(): string {
-    return API_KEY_STORAGE;
-  }
-
-  static getKey(): string | null {
-    const manualKey = localStorage.getItem(API_KEY_STORAGE);
-    if (manualKey && manualKey.length > 10) {
-      return manualKey;
+  static getAllKeys(): ProviderKeys {
+    const stored = localStorage.getItem(PROVIDERS_STORAGE)
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch {
+        return {}
+      }
     }
-    const envKey = (import.meta as any).env?.GEMINI_API_KEY || (import.meta as any).env?.API_KEY;
-    if (envKey && envKey.length > 10) {
-      return envKey;
+    return {}
+  }
+
+  static getActiveProvider(): ProviderId | null {
+    const stored = localStorage.getItem(ACTIVE_PROVIDER_STORAGE) as ProviderId | null
+    if (stored && ["google", "huggingface", "openrouter"].includes(stored)) {
+      return stored
     }
-    return null;
+    return null
   }
 
-  static setKey(key: string): void {
-    if (key && key.trim().length > 10) {
-      localStorage.setItem(API_KEY_STORAGE, key.trim());
+  static setActiveProvider(providerId: ProviderId): void {
+    localStorage.setItem(ACTIVE_PROVIDER_STORAGE, providerId)
+  }
+
+  static getKey(providerId: ProviderId): string | null {
+    const keys = this.getAllKeys()
+    const providerKey = keys[providerId]
+    if (providerKey?.enabled && providerKey?.key?.length > 10) {
+      return providerKey.key
+    }
+    return null
+  }
+
+  static setKey(providerId: ProviderId, key: string): void {
+    if (!key || key.trim().length < 10) return
+
+    const keys = this.getAllKeys()
+    keys[providerId] = {
+      key: key.trim(),
+      enabled: true,
+    }
+    localStorage.setItem(PROVIDERS_STORAGE, JSON.stringify(keys))
+
+    if (!this.getActiveProvider()) {
+      this.setActiveProvider(providerId)
     }
   }
 
-  static clearKey(): void {
-    localStorage.removeItem(API_KEY_STORAGE);
+  static enableProvider(providerId: ProviderId): void {
+    const keys = this.getAllKeys()
+    if (keys[providerId]) {
+      keys[providerId].enabled = true
+      localStorage.setItem(PROVIDERS_STORAGE, JSON.stringify(keys))
+    }
   }
 
-  static isValidKey(key?: string | null): boolean {
-    const k = key ?? this.getKey();
-    return !!(k && k.length > 10);
+  static disableProvider(providerId: ProviderId): void {
+    const keys = this.getAllKeys()
+    if (keys[providerId]) {
+      keys[providerId].enabled = false
+      localStorage.setItem(PROVIDERS_STORAGE, JSON.stringify(keys))
+    }
+  }
+
+  static clearKey(providerId: ProviderId): void {
+    const keys = this.getAllKeys()
+    delete keys[providerId]
+    localStorage.setItem(PROVIDERS_STORAGE, JSON.stringify(keys))
+  }
+
+  static clearAllKeys(): void {
+    localStorage.removeItem(PROVIDERS_STORAGE)
+    localStorage.removeItem(ACTIVE_PROVIDER_STORAGE)
   }
 
   static getStatus(): ApiKeyStatus {
-    const manualKey = localStorage.getItem(API_KEY_STORAGE);
-    const envKey = (import.meta as any).env?.GEMINI_API_KEY || (import.meta as any).env?.API_KEY;
+    const keys = this.getAllKeys()
+    const activeProvider = this.getActiveProvider()
+    const allProviders: ProviderId[] = ["google", "huggingface", "openrouter"]
 
-    if (manualKey && manualKey.length > 10) {
-      return {
-        hasKey: true,
-        keySource: "manual",
-        tier: "pro",
-        isValid: true,
-      };
+    const providerStatuses: Record<ProviderId, ProviderStatus> = {
+      google: { providerId: "google", hasKey: false, keyEnabled: false, isValid: false },
+      huggingface: { providerId: "huggingface", hasKey: false, keyEnabled: false, isValid: false },
+      openrouter: { providerId: "openrouter", hasKey: false, keyEnabled: false, isValid: false },
     }
 
-    if (envKey && envKey.length > 10) {
-      return {
-        hasKey: true,
-        keySource: "environment",
-        tier: this.detectTier(envKey),
-        isValid: true,
-      };
+    let hasAnyKey = false
+    let currentKey: string | null = null
+
+    for (const providerId of allProviders) {
+      const keyData = keys[providerId]
+      if (keyData?.key && keyData.key.length > 10) {
+        providerStatuses[providerId].hasKey = true
+        providerStatuses[providerId].keyEnabled = keyData.enabled
+        providerStatuses[providerId].isValid = true
+        hasAnyKey = true
+
+        if (activeProvider === providerId && keyData.enabled) {
+          currentKey = keyData.key
+        }
+      }
     }
 
     return {
-      hasKey: false,
-      keySource: "none",
-      tier: "free",
-      isValid: false,
-    };
+      activeProvider,
+      providers: providerStatuses,
+      hasAnyKey,
+      currentKey,
+    }
   }
 
-  private static detectTier(key: string): "free" | "pro" {
-    return "pro";
+  static getCurrentKey(): string | null {
+    const activeProvider = this.getActiveProvider()
+    if (!activeProvider) return null
+    return this.getKey(activeProvider)
   }
 
-  static async testConnection(key?: string): Promise<{ success: boolean; error?: string }> {
-    const apiKey = key ?? this.getKey();
-    if (!apiKey) {
-      return { success: false, error: "No API key provided" };
-    }
-
-    try {
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: { parts: [{ text: "test" }] },
-        config: { maxOutputTokens: 1 },
-      });
-
-      if (response.text !== undefined) {
-        return { success: true };
-      }
-      return { success: false, error: "Invalid response from API" };
-    } catch (error: any) {
-      return { success: false, error: error.message || "Connection failed" };
-    }
+  static isCurrentProviderConfigured(): boolean {
+    const key = this.getCurrentKey()
+    return !!key
   }
 }
 
 export class QuotaService {
-  static getStorageKey(): string {
-    return QUOTA_STORAGE;
-  }
+  private static readonly STORAGE_KEY = "PAPERDOLL_QUOTA"
 
-  static getQuota(): QuotaInfo {
-    const stored = localStorage.getItem(QUOTA_STORAGE);
+  static getQuota(): { requestsUsed: number; requestsLimit: number; lastReset: number; isUnlimited: boolean } {
+    const stored = localStorage.getItem(this.STORAGE_KEY)
     if (stored) {
       try {
-        const data = JSON.parse(stored);
-        return {
-          requestsUsed: data.requestsUsed || 0,
-          requestsLimit: data.requestsLimit || 60,
-          lastReset: data.lastReset || Date.now(),
-          isUnlimited: data.isUnlimited || false,
-        };
+        return JSON.parse(stored)
       } catch {
-        return this.getDefaultQuota();
+        return this.getDefaultQuota()
       }
     }
-    return this.getDefaultQuota();
+    return this.getDefaultQuota()
   }
 
-  private static getDefaultQuota(): QuotaInfo {
+  private static getDefaultQuota() {
     return {
       requestsUsed: 0,
       requestsLimit: 120,
       lastReset: Date.now(),
-      isUnlimited: false,
+      isUnlimited: true,
     }
   }
 
-  static incrementUsage(): QuotaInfo {
-    const quota = this.getQuota();
-    
-    const now = Date.now();
-    const hoursSinceReset = (now - quota.lastReset) / (1000 * 60 * 60);
-    
-    if (hoursSinceReset >= 24) {
-      quota.requestsUsed = 0;
-      quota.lastReset = now;
-    }
-
-    quota.requestsUsed += 1;
-    localStorage.setItem(QUOTA_STORAGE, JSON.stringify(quota));
-    
-    return quota;
+  static incrementUsage(): void {
+    const quota = this.getQuota()
+    quota.requestsUsed += 1
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(quota))
   }
 
   static getRemainingRequests(): number {
-    const quota = this.getQuota();
-    if (quota.isUnlimited) return Infinity;
-    return Math.max(0, quota.requestsLimit - quota.requestsUsed);
+    const quota = this.getQuota()
+    if (quota.isUnlimited) return Infinity
+    return Math.max(0, quota.requestsLimit - quota.requestsUsed)
   }
 
   static isQuotaExceeded(): boolean {
-    const quota = this.getQuota();
-    if (quota.isUnlimited) return false;
-    return quota.requestsUsed >= quota.requestsLimit;
+    const quota = this.getQuota()
+    if (quota.isUnlimited) return false
+    return quota.requestsUsed >= quota.requestsLimit
   }
 
   static getQuotaPercentage(): number {
-    const quota = this.getQuota();
-    if (quota.isUnlimited) return 0;
-    return Math.min(100, (quota.requestsUsed / quota.requestsLimit) * 100);
-  }
-
-  static formatResetTime(): string {
-    const quota = this.getQuota();
-    const nextReset = quota.lastReset + (24 * 60 * 60 * 1000);
-    const now = Date.now();
-    const msRemaining = nextReset - now;
-
-    if (msRemaining <= 0) return "Resets soon";
-
-    const hours = Math.floor(msRemaining / (1000 * 60 * 60));
-    const minutes = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 0) {
-      return `Resets in ${hours}h ${minutes}m`;
-    }
-    return `Resets in ${minutes}m`;
+    const quota = this.getQuota()
+    if (quota.isUnlimited) return 0
+    return Math.min(100, (quota.requestsUsed / quota.requestsLimit) * 100)
   }
 }

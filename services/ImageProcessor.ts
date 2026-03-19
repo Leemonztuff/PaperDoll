@@ -119,4 +119,36 @@ export class ImageProcessor {
       img.onerror = reject;
     });
   }
+
+  static async extractAlpha(
+    sourceUrl: string,
+    threshold: number = 40,
+    feather: number = 5
+  ): Promise<string> {
+    return this.processAlpha(sourceUrl, threshold, feather);
+  }
+
+  static async exportImage(
+    sourceUrl: string,
+    format: "png" | "jpeg" | "webp" = "png",
+    bgColor: string = "#ffffff"
+  ): Promise<string> {
+    const img = await this.loadImage(sourceUrl);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context failed");
+
+    if (bgColor !== "transparent" && bgColor !== "#FF00FF") {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.drawImage(img, 0, 0);
+
+    const mimeType = format === "png" ? "image/png" : format === "jpeg" ? "image/jpeg" : "image/webp";
+    return canvas.toDataURL(mimeType);
+  }
 }

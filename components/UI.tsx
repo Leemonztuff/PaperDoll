@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import type { LayerData, ProviderId } from "../services/imageService";
 
 // --- DESIGN SYSTEM COMPONENTS ---
 
@@ -514,92 +515,75 @@ export const Loader: React.FC<{ message?: string; subMessage?: string }> = ({
 );
 
 interface SettingsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-  status: {
-    hasKey: boolean;
-    keySource: "none" | "manual" | "environment";
-    tier: "free" | "pro";
-    isValid: boolean;
-  };
-  quota: {
-    requestsUsed: number;
-    requestsLimit: number;
-    isUnlimited: boolean;
-  };
-  remainingRequests: number;
-  isQuotaExceeded: boolean;
-  quotaPercentage: number;
-  manualKey: string;
-  showKey: boolean;
-  isTesting: boolean;
-  testResult: { success: boolean; error?: string } | null;
-  onManualKeyChange: (key: string) => void;
-  onSaveKey: () => void;
-  onClearKey: () => void;
-  onToggleShowKey: () => void;
-  onTestConnection: () => Promise<void>;
+  isOpen: boolean
+  onClose: () => void
+  activeProvider: "google" | "huggingface" | "openrouter" | null
+  providerKeys: Record<string, { hasKey: boolean; keyEnabled: boolean }>
+  currentKeyInput: string
+  isTesting: boolean
+  testResult: { success: boolean; error?: string } | null
+  onProviderChange: (provider: "google" | "huggingface" | "openrouter") => void
+  onKeyChange: (key: string) => void
+  onSave: () => void
+  onClear: () => void
+  onTest: () => Promise<void>
 }
+
+const PROVIDERS = [
+  {
+    id: "google" as const,
+    name: "Google Gemini",
+    description: "Nano Banana models",
+    icon: "🍌",
+    color: "from-blue-500 to-cyan-500",
+  },
+  {
+    id: "huggingface" as const,
+    name: "Hugging Face",
+    description: "FLUX / Stable Diffusion",
+    icon: "🤗",
+    color: "from-orange-500 to-yellow-500",
+  },
+  {
+    id: "openrouter" as const,
+    name: "OpenRouter",
+    description: "Gemini via OpenRouter",
+    icon: "🌐",
+    color: "from-purple-500 to-pink-500",
+  },
+]
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isOpen,
   onClose,
-  status,
-  quota,
-  remainingRequests,
-  isQuotaExceeded,
-  quotaPercentage,
-  manualKey,
-  showKey,
+  activeProvider,
+  providerKeys,
+  currentKeyInput,
   isTesting,
   testResult,
-  onManualKeyChange,
-  onSaveKey,
-  onClearKey,
-  onToggleShowKey,
-  onTestConnection,
+  onProviderChange,
+  onKeyChange,
+  onSave,
+  onClear,
+  onTest,
 }) => {
-  if (!isOpen) return null;
+  const [showKey, setShowKey] = useState(false)
 
-  const getTierBadge = () => {
-    if (status.tier === "pro") {
-      return (
-        <span className="px-2 py-1 bg-indigo-600/20 border border-indigo-500/30 rounded-lg text-[9px] font-bold uppercase tracking-widest text-indigo-300">
-          PRO TIER
-        </span>
-      );
-    }
-    return (
-      <span className="px-2 py-1 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-[9px] font-bold uppercase tracking-widest text-emerald-300">
-        FREE TIER
-      </span>
-    );
-  };
+  if (!isOpen) return null
 
-  const getStatusIndicator = () => {
-    if (!status.hasKey) {
-      return (
-        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <MicroLabel color="text-red-400">NO API KEY CONFIGURED</MicroLabel>
-        </div>
-      );
-    }
-    if (status.keySource === "manual") {
-      return (
-        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-          <div className="w-2 h-2 rounded-full bg-emerald-500" />
-          <MicroLabel color="text-emerald-400">CUSTOM KEY ACTIVE</MicroLabel>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center gap-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-        <div className="w-2 h-2 rounded-full bg-indigo-500" />
-        <MicroLabel color="text-indigo-400">ENVIRONMENT KEY</MicroLabel>
-      </div>
-    );
-  };
+  const getProviderStatus = (id: string) => {
+    const data = providerKeys[id]
+    if (!data?.hasKey) return { color: "bg-slate-600", text: "Not configured" }
+    if (data.keyEnabled) return { color: "bg-emerald-500", text: "Active" }
+    return { color: "bg-amber-500", text: "Saved" }
+  }
+
+  const getCurrentProviderInfo = () => {
+    return PROVIDERS.find((p) => p.id === activeProvider)
+  }
+
+  const currentProviderInfo = getCurrentProviderInfo()
+  const hasCurrentKey = activeProvider ? providerKeys[activeProvider]?.hasKey : false
 
   return (
     <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4">
@@ -609,10 +593,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       />
       <Panel className="relative max-w-lg w-full bg-graphite-900 border border-white/10 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <SectionTitle className="text-slate-200">ENGINE CALIBRATION</SectionTitle>
-            {getTierBadge()}
-          </div>
+          <SectionTitle className="text-slate-200">API PROVIDERS</SectionTitle>
           <IconButton variant="ghost" onClick={onClose}>
             <svg
               className="w-5 h-5"
@@ -631,194 +612,194 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="space-y-6">
-          <ToolSection title="API Key Status">{getStatusIndicator()}</ToolSection>
+          <ToolSection title="Select Provider">
+            <div className="space-y-3">
+              {PROVIDERS.map((provider) => {
+                const status = getProviderStatus(provider.id)
+                const isActive = activeProvider === provider.id
 
-          <ToolSection title="Usage Quota">
-            <div className="space-y-4">
-              {status.hasKey && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <MicroLabel>
-                      {quota.isUnlimited ? "UNLIMITED" : `${remainingRequests} requests remaining`}
-                    </MicroLabel>
-                    <span className="text-[10px] font-mono text-indigo-300">
-                      {quota.isUnlimited ? "∞" : `${quota.requestsUsed}/${quota.requestsLimit}`}
-                    </span>
-                  </div>
-                  {!quota.isUnlimited && (
-                    <div className="w-full h-2 bg-graphite-950 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ${
-                          quotaPercentage > 80
-                            ? "bg-red-500"
-                            : quotaPercentage > 50
-                              ? "bg-amber-500"
-                              : "bg-indigo-500"
-                        }`}
-                        style={{ width: `${quotaPercentage}%` }}
-                      />
+                return (
+                  <button
+                    key={provider.id}
+                    onClick={() => onProviderChange(provider.id)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                      isActive
+                        ? `bg-gradient-to-r ${provider.color} border-white/20`
+                        : "bg-graphite-800/50 border-white/5 hover:border-white/10"
+                    }`}
+                  >
+                    <div className={`text-2xl ${isActive ? "" : "grayscale opacity-70"}`}>
+                      {provider.icon}
                     </div>
-                  )}
-                </div>
-              )}
-              {!status.hasKey && (
-                <p className="text-xs text-slate-400">
-                  Configure an API key below to start generating assets.
-                  Free tier includes limited requests per day.
-                </p>
-              )}
+                    <div className="flex-1 text-left">
+                      <div
+                        className={`text-sm font-bold uppercase tracking-wider ${
+                          isActive ? "text-white" : "text-slate-200"
+                        }`}
+                      >
+                        {provider.name}
+                      </div>
+                      <div
+                        className={`text-[10px] ${
+                          isActive ? "text-white/70" : "text-slate-500"
+                        }`}
+                      >
+                        {provider.description}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${status.color}`} />
+                      <span
+                        className={`text-[9px] font-bold uppercase ${
+                          isActive ? "text-white" : "text-slate-500"
+                        }`}
+                      >
+                        {status.text}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </ToolSection>
 
-          <ToolSection title="API Key Configuration">
-            <div className="space-y-4">
-              <div className="relative">
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={manualKey}
-                  onChange={(e) => onManualKeyChange(e.target.value)}
-                  placeholder="Paste your nanobanana API key here..."
-                  className="w-full bg-graphite-950 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-indigo-500/50 focus:bg-graphite-900 outline-none transition-all font-mono placeholder:text-slate-600 pr-12"
-                />
-                <button
-                  onClick={onToggleShowKey}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  {showKey ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              {testResult && (
-                <div
-                  className={`p-3 rounded-xl ${
-                    testResult.success
-                      ? "bg-emerald-500/10 border border-emerald-500/20"
-                      : "bg-red-500/10 border border-red-500/20"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {testResult.success ? (
-                      <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          {currentProviderInfo && (
+            <ToolSection title={`${currentProviderInfo.name} API Key`}>
+              <div className="space-y-4">
+                <div className="relative">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={currentKeyInput}
+                    onChange={(e) => onKeyChange(e.target.value)}
+                    placeholder={`Paste your ${currentProviderInfo.name} API key...`}
+                    className="w-full bg-graphite-950 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-indigo-500/50 focus:bg-graphite-900 outline-none transition-all font-mono placeholder:text-slate-600 pr-12"
+                  />
+                  <button
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showKey ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
                     )}
-                    <span className={`text-xs font-bold ${
-                      testResult.success ? "text-emerald-400" : "text-red-400"
-                    }`}>
-                      {testResult.success ? "Connection successful!" : testResult.error || "Connection failed"}
-                    </span>
+                  </button>
+                </div>
+
+                {testResult && (
+                  <div
+                    className={`p-3 rounded-xl ${
+                      testResult.success
+                        ? "bg-emerald-500/10 border border-emerald-500/20"
+                        : "bg-red-500/10 border border-red-500/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {testResult.success ? (
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                      <span className={`text-xs font-bold ${
+                        testResult.success ? "text-emerald-400" : "text-red-400"
+                      }`}>
+                        {testResult.success
+                          ? "Connection successful!"
+                          : testResult.error || "Connection failed"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="primary"
-                  onClick={onTestConnection}
-                  disabled={isTesting || manualKey.length < 10}
-                  className="flex-1"
-                >
-                  {isTesting ? "TESTING..." : "TEST CONNECTION"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={onSaveKey}
-                  disabled={manualKey.length < 10}
-                >
-                  SAVE
-                </Button>
-                <Button variant="danger" onClick={onClearKey}>
-                  CLEAR
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={onTest}
+                    disabled={isTesting || currentKeyInput.length < 10}
+                    className="flex-1"
+                  >
+                    {isTesting ? "TESTING..." : "TEST CONNECTION"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={onSave}
+                    disabled={currentKeyInput.length < 10}
+                  >
+                    SAVE
+                  </Button>
+                  {hasCurrentKey && (
+                    <Button variant="danger" onClick={onClear}>
+                      CLEAR
+                    </Button>
+                  )}
+                </div>
               </div>
+            </ToolSection>
+          )}
+
+          <ToolSection title="How to Get an API Key">
+            <div className="space-y-3">
+              <a
+                href="https://aistudio.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors"
+              >
+                <span className="text-xl">🍌</span>
+                <div>
+                  <div className="text-xs font-bold text-blue-300">Google AI Studio</div>
+                  <div className="text-[10px] text-slate-400">500 requests/day free</div>
+                </div>
+              </a>
+
+              <a
+                href="https://huggingface.co/settings/tokens"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl hover:bg-orange-500/20 transition-colors"
+              >
+                <span className="text-xl">🤗</span>
+                <div>
+                  <div className="text-xs font-bold text-orange-300">Hugging Face</div>
+                  <div className="text-[10px] text-slate-400">Free tier available</div>
+                </div>
+              </a>
+
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl hover:bg-purple-500/20 transition-colors"
+              >
+                <span className="text-xl">🌐</span>
+                <div>
+                  <div className="text-xs font-bold text-purple-300">OpenRouter</div>
+                  <div className="text-[10px] text-slate-400">Multiple models</div>
+                </div>
+              </a>
             </div>
           </ToolSection>
 
-          <ToolSection title="Get Your API Key">
-            <div className="space-y-4">
-              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Quick Setup Guide</span>
-                </div>
-                <ol className="text-[11px] text-slate-300 space-y-2 list-decimal list-inside">
-                  <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline font-bold">Google AI Studio</a></li>
-                  <li>Sign in with your Google account</li>
-                  <li>Click "Get API Key" in the sidebar</li>
-                  <li>Create a new API key or copy an existing one</li>
-                  <li>Paste the key above and click "Test Connection"</li>
-                </ol>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <a
-                  href="https://aistudio.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-graphite-800 hover:bg-graphite-700 border border-white/10 rounded-xl text-[10px] font-bold text-slate-300 transition-all"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  AI Studio
-                </a>
-                <a
-                  href="https://ai.google.dev/gemini-api/docs/billing"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-graphite-800 hover:bg-graphite-700 border border-white/10 rounded-xl text-[10px] font-bold text-slate-300 transition-all"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  Pricing
-                </a>
-              </div>
-
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Free Tier Benefits</span>
-                </div>
-                <ul className="text-[10px] text-slate-400 space-y-1">
-                  <li>• <span className="text-emerald-400 font-bold">500 requests/day</span> free with Gemini 2.5 Flash</li>
-                  <li>• No credit card required</li>
-                  <li>• Image generation included</li>
-                </ul>
-              </div>
-
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7m14 13V7a2 2 0 00-2-2h-6l2 6h6l-2-6m-6 0V5a2 2 0 10-4 0v6l2 6h6l2-6V11a2 2 0 10-4 0" />
-                  </svg>
-                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Pro Tier (Paid)</span>
-                </div>
-                <ul className="text-[10px] text-slate-400 space-y-1">
-                  <li>• Access to Gemini 3 Pro Image model</li>
-                  <li>• Higher quality outputs</li>
-                  <li>• ~$0.134 per image generated</li>
-                </ul>
-              </div>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span className="text-xs font-bold text-emerald-300">No Cost to Developer</span>
             </div>
-          </ToolSection>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Each user pays for their own API usage. You don't need to pay for servers or worry about rate limits. Each provider manages their own quota.
+            </p>
+          </div>
 
           <Button variant="glass" onClick={onClose} className="w-full">
             CLOSE
@@ -833,20 +814,17 @@ interface LayerSeparatorProps {
   isOpen: boolean
   onClose: () => void
   sourceImage: string
+  providerId: ProviderId
+  apiKey: string
   onLayersExtracted: (layers: LayerData) => void
-}
-
-interface LayerData {
-  body: string
-  clothing: string
-  accessories: string
-  background: string
 }
 
 export const LayerSeparator: React.FC<LayerSeparatorProps> = ({
   isOpen,
   onClose,
   sourceImage,
+  providerId,
+  apiKey,
   onLayersExtracted,
 }) => {
   const [isExtracting, setIsExtracting] = useState(false)
@@ -867,7 +845,7 @@ export const LayerSeparator: React.FC<LayerSeparatorProps> = ({
     setProgress(0)
 
     try {
-      const { GeminiService, LayerData } = await import("../services/geminiService")
+      const { ImageService } = await import("../services/imageService")
       const { DEFAULT_CONFIG } = await import("../constants")
 
       const layers: LayerData = {
@@ -882,7 +860,9 @@ export const LayerSeparator: React.FC<LayerSeparatorProps> = ({
         setExtractingLayer(layerDefinitions[i].label)
         setProgress(((i + 0.5) / layerDefinitions.length) * 100)
 
-        layers[layer] = await GeminiService.extractLayer(
+        layers[layer] = await ImageService.extractLayer(
+          providerId,
+          apiKey,
           sourceImage,
           layer,
           DEFAULT_CONFIG

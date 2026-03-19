@@ -1,24 +1,15 @@
 import React, { useState, useCallback, useEffect } from "react"
 import { useSpriteForge } from "./hooks/useSpriteForge"
-import { useApiKey } from "./hooks/useApiKey"
+import { useProvider } from "./hooks/useProvider"
 import { Atelier } from "./components/Atelier"
 import { EvolutionTree } from "./components/EvolutionTree"
 import { ImageModal } from "./components/ImageModal"
-import { GeneratedOutfit, ModelType } from "./types"
+import { GeneratedOutfit } from "./types"
 import {
   NavButton,
   MobileNavButton,
   SettingsPanel,
 } from "./components/UI"
-
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>
-      openSelectKey: () => Promise<void>
-    }
-  }
-}
 
 const App: React.FC = () => {
   const {
@@ -32,37 +23,29 @@ const App: React.FC = () => {
   } = useSpriteForge()
 
   const {
-    status,
-    quota,
-    manualKey,
-    showKey,
+    activeProvider,
+    providerKeys,
+    currentKey,
+    currentKeyInput,
     isTesting,
     testResult,
-    setManualKey,
-    saveKey,
-    clearKey,
-    toggleShowKey,
+    setActiveProvider,
+    setCurrentKeyInput,
+    saveCurrentKey,
+    clearCurrentKey,
     testConnection,
-    refreshStatus,
-    remainingRequests,
-    isQuotaExceeded,
-    quotaPercentage,
-  } = useApiKey()
+  } = useProvider()
 
   const [prompt, setPrompt] = useState("")
   const [activeTab, setActiveTab] = useState<"forge" | "tree">("forge")
   const [selectedOutfit, setSelectedOutfit] = useState<GeneratedOutfit | null>(null)
-  const [isSetupOpen, setIsSetupOpen] = useState(!status.hasKey)
+  const [isSetupOpen, setIsSetupOpen] = useState(!currentKey)
 
   useEffect(() => {
-    if (!status.hasKey) {
+    if (!currentKey) {
       setIsSetupOpen(true)
     }
-  }, [status.hasKey])
-
-  const handleModelChange = (model: ModelType) => {
-    dispatch({ type: "UPDATE_CONFIG", payload: { model } })
-  }
+  }, [currentKey])
 
   const handleSelectAsParent = (o: GeneratedOutfit) => {
     dispatch({ type: "SET_ACTIVE_PARENT", payload: o })
@@ -72,7 +55,7 @@ const App: React.FC = () => {
   }
 
   const handleForge = useCallback(async () => {
-    if (isQuotaExceeded) {
+    if (!currentKey) {
       setIsSetupOpen(true)
       return
     }
@@ -80,38 +63,25 @@ const App: React.FC = () => {
     try {
       await executeSynthesis(prompt)
     } catch (error: any) {
-      if (
-        error.message === "RESELECT_KEY" ||
-        error.message === "API_KEY_MISSING" ||
-        error.message === "QUOTA_EXCEEDED"
-      ) {
+      if (error.message === "API_KEY_MISSING" || error.message === "NO_PROVIDER_SELECTED") {
         setIsSetupOpen(true)
       }
     }
-  }, [executeSynthesis, prompt, isQuotaExceeded])
+  }, [executeSynthesis, prompt, currentKey])
 
-  const getQuotaWarning = () => {
-    if (isQuotaExceeded) {
+  const getProviderIndicator = () => {
+    if (!activeProvider) {
       return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[500] bg-red-500/90 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl animate-in slide-in-from-top-2 duration-300">
-          QUOTA EXCEEDED - Please upgrade or wait for reset
-        </div>
+        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" title="No API Key" />
       )
     }
-    if (quotaPercentage > 80) {
-      return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[500] bg-amber-500/90 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl animate-in slide-in-from-top-2 duration-300">
-          WARNING: {remainingRequests} requests remaining today
-        </div>
-      )
-    }
-    return null
+    return (
+      <div className="w-3 h-3 rounded-full bg-emerald-500" title={`${activeProvider} active`} />
+    )
   }
 
   return (
     <div className="flex flex-col md:flex-row h-full w-full bg-graphite-950 text-[#f8fafc] overflow-hidden relative">
-      {getQuotaWarning()}
-
       <aside className="hidden md:flex w-16 lg:w-20 flex-col items-center py-6 bg-graphite-950 border-r border-white/5 z-50 shrink-0">
         <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg mb-8">
           <svg
@@ -171,15 +141,7 @@ const App: React.FC = () => {
           />
         </nav>
         <div className="flex flex-col items-center gap-3">
-          {!status.hasKey && (
-            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" title="No API Key" />
-          )}
-          {status.hasKey && status.tier === "free" && (
-            <div className="w-3 h-3 rounded-full bg-emerald-500" title="Free Tier" />
-          )}
-          {status.hasKey && status.tier === "pro" && (
-            <div className="w-3 h-3 rounded-full bg-indigo-500" title="Pro Tier" />
-          )}
+          {getProviderIndicator()}
           <button
             onClick={() => setIsSetupOpen(true)}
             className={`w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center rounded-xl transition-all ${
@@ -237,8 +199,8 @@ const App: React.FC = () => {
             onPromoteToBase={(url) =>
               dispatch({ type: "SET_BASE_IMAGE", payload: url })
             }
-            hasApiKey={status.hasKey}
-            isQuotaExceeded={isQuotaExceeded}
+            hasApiKey={!!currentKey}
+            isQuotaExceeded={false}
           />
         )}
         {activeTab === "tree" && (
@@ -337,20 +299,16 @@ const App: React.FC = () => {
       <SettingsPanel
         isOpen={isSetupOpen}
         onClose={() => setIsSetupOpen(false)}
-        status={status}
-        quota={quota}
-        remainingRequests={remainingRequests}
-        isQuotaExceeded={isQuotaExceeded}
-        quotaPercentage={quotaPercentage}
-        manualKey={manualKey}
-        showKey={showKey}
+        activeProvider={activeProvider}
+        providerKeys={providerKeys}
+        currentKeyInput={currentKeyInput}
         isTesting={isTesting}
         testResult={testResult}
-        onManualKeyChange={setManualKey}
-        onSaveKey={saveKey}
-        onClearKey={clearKey}
-        onToggleShowKey={toggleShowKey}
-        onTestConnection={testConnection}
+        onProviderChange={setActiveProvider}
+        onKeyChange={setCurrentKeyInput}
+        onSave={saveCurrentKey}
+        onClear={clearCurrentKey}
+        onTest={testConnection}
       />
 
       {selectedOutfit && (
@@ -359,6 +317,8 @@ const App: React.FC = () => {
           onClose={() => setSelectedOutfit(null)}
           onDelete={deleteAsset}
           onSelectAsParent={handleSelectAsParent}
+          providerId={activeProvider}
+          apiKey={currentKey}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react"
 import { GeneratedOutfit } from "../types"
+import type { LayerData, ProviderId } from "../services/imageService"
 import {
   IconButton,
   Button,
@@ -18,6 +19,8 @@ interface ImageModalProps {
   onClose: () => void
   onDelete: (id: string) => void
   onSelectAsParent: (o: GeneratedOutfit) => void
+  providerId?: ProviderId
+  apiKey?: string
 }
 
 type BgMode = "checker" | "studio" | "void" | "bright"
@@ -28,6 +31,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   onClose,
   onDelete,
   onSelectAsParent,
+  providerId,
+  apiKey,
 }) => {
   const [zoom, setZoom] = useState(1)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -493,12 +498,16 @@ export const ImageModal: React.FC<ImageModalProps> = ({
         )}
       </div>
 
-      <LayerSeparator
-        isOpen={isLayerSeparatorOpen}
-        onClose={() => setIsLayerSeparatorOpen(false)}
-        sourceImage={outfit.url}
-        onLayersExtracted={setExtractedLayers}
-      />
+      {providerId && apiKey && (
+        <LayerSeparator
+          isOpen={isLayerSeparatorOpen}
+          onClose={() => setIsLayerSeparatorOpen(false)}
+          sourceImage={outfit.url}
+          providerId={providerId}
+          apiKey={apiKey}
+          onLayersExtracted={setExtractedLayers}
+        />
+      )}
 
       {extractedLayers && (
         <LayerPreview
