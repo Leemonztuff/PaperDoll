@@ -186,7 +186,7 @@ export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
     id: "stability",
     name: "Stability AI",
     description: "Unlimited img2img with Community License",
-    model: "stable-diffusion-xl-turbo-v2-1",
+    model: "stable-diffusion-xl-1024-v1-0",
     freeTier: "UNLIMITED*",
     website: "https://platform.stability.ai",
   },

@@ -11,7 +11,7 @@ import {
 
 const STABILITY_API_URL = "https://api.stability.ai/v1"
 
-const STABILITY_ENGINE = "stable-diffusion-xl-turbo-v2-1"
+const STABILITY_ENGINE = "stable-diffusion-xl-1024-v1-0"
 
 export class StabilityProvider implements IImageProvider {
   readonly id: ProviderId = "stability"
@@ -58,23 +58,23 @@ export class StabilityProvider implements IImageProvider {
     prompt: string,
     sourceImage?: string
   ): Promise<string> {
-    const formData = new FormData()
-
-    if (sourceImage) {
-      const imageBuffer = Uint8Array.from(atob(this.stripBase64(sourceImage)), c => c.charCodeAt(0))
-      const imageBlob = new Blob([imageBuffer], { type: "image/png" })
-      formData.append("init_image", imageBlob, "image.png")
+    const payload: Record<string, unknown> = {
+      prompt: prompt,
+      negative_prompt: "blurry, low quality, distorted, deformed, bad anatomy",
+      output_format: { type: "png" },
     }
 
-    formData.append("prompt", prompt)
-    formData.append("negative_prompt", "blurry, low quality, distorted, deformed, bad anatomy")
+    if (sourceImage) {
+      payload.image = this.stripBase64(sourceImage)
+    }
 
     const response = await fetch(`${STABILITY_API_URL}/generation/${STABILITY_ENGINE}/image-to-image`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-      body: formData,
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
