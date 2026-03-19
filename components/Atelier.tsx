@@ -1,6 +1,6 @@
-import React, { useState, useRef } from "react";
-import { AppState, ForgeMode, NeuralMacro, NeuralNode } from "../types";
-import { QUICK_TAGS } from "../constants";
+import React, { useState, useRef } from "react"
+import { AppState, ForgeMode, NeuralMacro, NeuralNode } from "../types"
+import { QUICK_TAGS } from "../constants"
 import {
   IconButton,
   Tag,
@@ -18,8 +18,7 @@ import {
   Card,
   TelemetryItem,
   ModuleToggle,
-} from "./UI";
-import { GeminiService } from "../services/geminiService";
+} from "./UI"
 
 interface AtelierProps {
   state: AppState;
@@ -56,20 +55,8 @@ export const Atelier: React.FC<AtelierProps> = ({
   hasApiKey,
   isQuotaExceeded,
 }) => {
-  const [isAlchemizing, setIsAlchemizing] = useState(false);
   const [showModules, setShowModules] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAlchemy = async () => {
-    if (!prompt) return;
-    setIsAlchemizing(true);
-    try {
-      const enhanced = await GeminiService.enhancePrompt(prompt);
-      setPrompt(enhanced);
-    } finally {
-      setIsAlchemizing(false);
-    }
-  };
 
   if (!state.baseImage) {
     return (
@@ -243,18 +230,7 @@ export const Atelier: React.FC<AtelierProps> = ({
           </ToolSection>
 
           {/* PROMPT BOX */}
-          <ToolSection
-            title="Directive"
-            action={
-              <button
-                onClick={handleAlchemy}
-                disabled={isAlchemizing || !prompt}
-                className={`text-[9px] font-bold uppercase tracking-widest transition-all ${isAlchemizing ? "text-indigo-400 animate-pulse" : "text-slate-500 hover:text-white"}`}
-              >
-                AI Assist
-              </button>
-            }
-          >
+          <ToolSection title="Directive">
             <TextArea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}

@@ -133,10 +133,10 @@ export class QuotaService {
   private static getDefaultQuota(): QuotaInfo {
     return {
       requestsUsed: 0,
-      requestsLimit: 60,
+      requestsLimit: 120,
       lastReset: Date.now(),
       isUnlimited: false,
-    };
+    }
   }
 
   static incrementUsage(): QuotaInfo {
