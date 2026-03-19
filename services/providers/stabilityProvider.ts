@@ -9,7 +9,7 @@ import {
   DEFAULT_PROMPTS,
 } from "./baseProvider"
 
-const STABILITY_API_URL = "https://api.stability.ai/v1"
+const STABILITY_API_URL = "https://api.stability.ai/v2beta/stable-image"
 
 const STABILITY_ENGINE = "stable-diffusion-xl-1024-v1-0"
 
@@ -60,16 +60,17 @@ export class StabilityProvider implements IImageProvider {
   ): Promise<string> {
     const formData = new FormData()
 
-    formData.append("prompt", prompt)
-    formData.append("negative_prompt", "blurry, low quality, distorted, deformed, bad anatomy")
-
     if (sourceImage) {
       const imageBuffer = Uint8Array.from(atob(this.stripBase64(sourceImage)), c => c.charCodeAt(0))
       const imageBlob = new Blob([imageBuffer], { type: "image/png" })
       formData.append("image", imageBlob, "image.png")
     }
 
-    const response = await fetch(`${STABILITY_API_URL}/generation/${STABILITY_ENGINE}/image-to-image`, {
+    formData.append("prompt", prompt)
+    formData.append("negative_prompt", "blurry, low quality, distorted, deformed, bad anatomy")
+    formData.append("output_format", "png")
+
+    const response = await fetch(`${STABILITY_API_URL}/generate/${STABILITY_ENGINE}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
